@@ -429,12 +429,12 @@
   revision = "a99b9330df5b084699e1f3f90096276e95f9d61d"
 
 [[projects]]
-  digest = "1:dbee7dc52291bb149388085eeb20561d4cb3c2044e0fa6ffa8d342c6b305f4bf"
+  digest = "1:89f47ea71d395c3c1f6aa34fb00c58eda07c3a715be206f574fbf23ab82730e2"
   name = "github.com/percona/promconfig"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "b6ed0406fe0b84c57801bd8ca6842f00e52cf894"
-  version = "v0.1.1"
+  revision = "fe366b5bd3e15e867670f2a1a194b7a6aa5139da"
+  version = "v0.1.2"
 
 [[projects]]
   digest = "1:4047c378584616813d610c9f993bf90dd0d07aed8d94bd3bc299cd35ececdcba"
