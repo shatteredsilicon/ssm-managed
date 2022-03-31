@@ -35,13 +35,14 @@ import (
 	"sync"
 	"time"
 
-	grpc_gateway "github.com/Percona-Lab/grpc-gateway/v2/runtime"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_validator "github.com/grpc-ecosystem/go-grpc-middleware/validator"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpc_gateway "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/percona/pmm/api/agentpb"
 	"github.com/percona/pmm/api/inventorypb"
 	"github.com/percona/pmm/api/managementpb"
+	pmmerrors "github.com/percona/pmm/utils/errors"
 	azurev1beta1 "github.com/percona/pmm/api/managementpb/azure"
 	backupv1beta1 "github.com/percona/pmm/api/managementpb/backup"
 	dbaasv1beta1 "github.com/percona/pmm/api/managementpb/dbaas"
@@ -299,6 +300,7 @@ func runHTTP1Server(ctx context.Context, deps *http1ServerDeps) {
 
 	proxyMux := grpc_gateway.NewServeMux(
 		grpc_gateway.WithMarshalerOption(grpc_gateway.MIMEWildcard, marshaller),
+		grpc_gateway.WithErrorHandler(pmmerrors.PMMHTTPErrorHandler),
 	)
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
