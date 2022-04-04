@@ -652,8 +652,8 @@ github.com/percona-platform/dbaas-api v0.0.0-20220110092915-5aacd784d472 h1:Henk
 github.com/percona-platform/dbaas-api v0.0.0-20220110092915-5aacd784d472/go.mod h1:WZZ3Hi+lAWCaGWmsrfkkvRQPkIa8n1OZ0s8Su+vbgus=
 github.com/percona-platform/saas v0.0.0-20220317155708-e7f0cb2ec37f h1:yQmj2OdE1hhZ6W3YUyu3uywokveAE/63AoxBu7VcxqM=
 github.com/percona-platform/saas v0.0.0-20220317155708-e7f0cb2ec37f/go.mod h1:gFUwaFp6Ugu5qsBwiOVJYbDlzgZ77tmXdXGO7tG5xVI=
-github.com/percona/pmm v0.0.0-20220331181123-571731d896ff h1:62vh8VpoX357hMGgyGXD+koDnL3U8IwXFuurPClCYck=
-github.com/percona/pmm v0.0.0-20220331181123-571731d896ff/go.mod h1:0F9nNWzNYi65CYeMwySM09uAa0coV290uQxvhRLt+aM=
+github.com/percona/pmm v0.0.0-20220404080917-457298770dfa h1:EzaQCLn1IWX/sdw4PVP0ZvokneUfAfFOGlow+tI3R2k=
+github.com/percona/pmm v0.0.0-20220404080917-457298770dfa/go.mod h1:BcZtKS2LBdTOtZ0p5KibLE25xIh9BSsWbtpV/yc0Bfg=
 github.com/percona/promconfig v0.2.1/go.mod h1:Y2uXi5QNk71+ceJHuI9poank+0S1kjxd3K105fXKVkg=
 github.com/percona/promconfig v0.2.4-0.20211110115058-98687f586f54 h1:aI1emmycDTGWKsBdxFPKZqohfBbK4y2ta9G4+RX7gVg=
 github.com/percona/promconfig v0.2.4-0.20211110115058-98687f586f54/go.mod h1:Y2uXi5QNk71+ceJHuI9poank+0S1kjxd3K105fXKVkg=
@@ -1228,7 +1228,6 @@ gopkg.in/go-playground/validator.v9 v9.29.1/go.mod h1:+c9/zcJMFNgbLvly1L1V+PpxWd
 gopkg.in/ini.v1 v1.57.0/go.mod h1:pNLf8WUiyNEtQjuu5G5vTm06TEv9tsIgeAvK8hOrP4k=
 gopkg.in/ini.v1 v1.66.4 h1:SsAcf+mM7mRZo2nJNGt8mZCjG8ZRaNGMURJw7BsIST4=
 gopkg.in/ini.v1 v1.66.4/go.mod h1:pNLf8WUiyNEtQjuu5G5vTm06TEv9tsIgeAvK8hOrP4k=
-gopkg.in/reform.v1 v1.5.0/go.mod h1:AIv0CbDRJ0ljQwptGeaIXfpDRo02uJwTq92aMFELEeU=
 gopkg.in/reform.v1 v1.5.1 h1:7vhDFW1n1xAPC6oDSvIvVvpRkaRpXlxgJ4QB4s3aDdo=
 gopkg.in/reform.v1 v1.5.1/go.mod h1:AIv0CbDRJ0ljQwptGeaIXfpDRo02uJwTq92aMFELEeU=
 gopkg.in/resty.v1 v1.12.0/go.mod h1:mDo4pnntr5jdWRML875a/NmxYqAlA73dVijT2AXvQQo=
