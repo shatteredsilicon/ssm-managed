@@ -22,8 +22,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/percona/pmm-managed/api"
-	"github.com/percona/pmm-managed/services/logs"
+	"github.com/shatteredsilicon/ssm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/services/logs"
 )
 
 type LogsServer struct {

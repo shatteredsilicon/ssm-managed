@@ -43,12 +43,12 @@ import (
 	"google.golang.org/grpc/status"
 	"gopkg.in/reform.v1"
 
-	"github.com/percona/pmm-managed/models"
-	"github.com/percona/pmm-managed/services"
-	"github.com/percona/pmm-managed/services/prometheus"
-	"github.com/percona/pmm-managed/services/qan"
-	"github.com/percona/pmm-managed/utils/logger"
-	"github.com/percona/pmm-managed/utils/ports"
+	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
+	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/utils/ports"
 )
 
 const (
@@ -473,7 +473,7 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 	}
 	if agent.MySQLDisableTablestats == nil || !*agent.MySQLDisableTablestats {
 		// enable tablestats and a few related collectors just like pmm-admin
-		// https://github.com/percona/pmm-client/blob/e94b61ed0e5482a27039f0d1b0b36076731f0c29/pmm/plugin/mysql/metrics/metrics.go#L98-L105
+		// https://github.com/shatteredsilicon/ssm-client/blob/e94b61ed0e5482a27039f0d1b0b36076731f0c29/pmm/plugin/mysql/metrics/metrics.go#L98-L105
 		arguments = append(arguments, "-collect.auto_increment.columns")
 		arguments = append(arguments, "-collect.info_schema.tables")
 		arguments = append(arguments, "-collect.info_schema.tablestats")

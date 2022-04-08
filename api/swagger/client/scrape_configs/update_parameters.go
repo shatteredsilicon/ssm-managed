@@ -17,7 +17,7 @@ import (
 
 	strfmt "github.com/go-openapi/strfmt"
 
-	models "github.com/percona/pmm-managed/api/swagger/models"
+	models "github.com/shatteredsilicon/ssm-managed/api/swagger/models"
 )
 
 // NewUpdateParams creates a new UpdateParams object

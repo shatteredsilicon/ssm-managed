@@ -20,8 +20,8 @@ import (
 	"context"
 	"io/ioutil"
 
-	"github.com/percona/pmm-managed/services/consul"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/services/consul"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 // We can't use *testing.T (we don't want to import "testing" package which adds flags like "-test.run"),

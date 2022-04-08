@@ -24,8 +24,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/percona/pmm-managed/services"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 // Supervisor starts and stops external processes (typically Agents) using system process supervisor

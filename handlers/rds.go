@@ -19,9 +19,9 @@ package handlers
 import (
 	"golang.org/x/net/context"
 
-	"github.com/percona/pmm-managed/api"
-	"github.com/percona/pmm-managed/services/rds"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/services/rds"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 type RDSServer struct {

@@ -35,14 +35,14 @@ import (
 
 	"github.com/AlekSi/pointer"
 	servicelib "github.com/percona/kardianos-service"
-	"github.com/percona/pmm/proto"
-	"github.com/percona/pmm/proto/config"
 	"github.com/pkg/errors"
+	"github.com/shatteredsilicon/ssm/proto"
+	"github.com/shatteredsilicon/ssm/proto/config"
 	"github.com/sirupsen/logrus"
 
-	"github.com/percona/pmm-managed/models"
-	"github.com/percona/pmm-managed/services"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 type Service struct {

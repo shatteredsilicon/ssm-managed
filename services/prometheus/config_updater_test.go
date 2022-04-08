@@ -20,17 +20,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Percona-Lab/promconfig/config"
-	sd_config "github.com/Percona-Lab/promconfig/discovery/config"
-	"github.com/Percona-Lab/promconfig/discovery/targetgroup"
 	"github.com/prometheus/common/model"
+	"github.com/shatteredsilicon/promconfig/config"
+	sd_config "github.com/shatteredsilicon/promconfig/discovery/config"
+	"github.com/shatteredsilicon/promconfig/discovery/targetgroup"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v2"
 
-	"github.com/percona/pmm-managed/utils/tests"
+	"github.com/shatteredsilicon/ssm-managed/utils/tests"
 )
 
 func assertYAMLEqual(t *testing.T, expected interface{}, actual interface{}) {

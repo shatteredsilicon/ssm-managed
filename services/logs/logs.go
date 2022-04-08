@@ -38,10 +38,10 @@ import (
 	"gopkg.in/reform.v1"
 	"gopkg.in/yaml.v2"
 
-	"github.com/percona/pmm-managed/models"
-	"github.com/percona/pmm-managed/services/consul"
-	"github.com/percona/pmm-managed/services/rds"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services/consul"
+	"github.com/shatteredsilicon/ssm-managed/services/rds"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 // File represents log file content.

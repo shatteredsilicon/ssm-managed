@@ -19,11 +19,11 @@ package prometheus
 import (
 	"regexp"
 
-	config_url "github.com/Percona-Lab/promconfig/common/config"
-	"github.com/Percona-Lab/promconfig/config"
-	sd_config "github.com/Percona-Lab/promconfig/discovery/config"
-	"github.com/Percona-Lab/promconfig/discovery/targetgroup"
 	"github.com/prometheus/common/model"
+	config_url "github.com/shatteredsilicon/promconfig/common/config"
+	"github.com/shatteredsilicon/promconfig/config"
+	sd_config "github.com/shatteredsilicon/promconfig/discovery/config"
+	"github.com/shatteredsilicon/promconfig/discovery/targetgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

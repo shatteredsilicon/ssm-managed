@@ -19,9 +19,9 @@ package handlers
 import (
 	"context"
 
-	"github.com/percona/pmm-managed/api"
-	"github.com/percona/pmm-managed/services/postgresql"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 // PostgreSQLServer handles requests to manage PostgreSQL nodes and services.

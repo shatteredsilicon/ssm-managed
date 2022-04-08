@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/percona/pmm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/api"
 )
 
 type DemoServer struct{}

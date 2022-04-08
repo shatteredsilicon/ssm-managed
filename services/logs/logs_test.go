@@ -33,10 +33,10 @@ import (
 	"gopkg.in/reform.v1"
 	"gopkg.in/reform.v1/dialects/mysql"
 
-	"github.com/percona/pmm-managed/models"
-	"github.com/percona/pmm-managed/services/consul"
-	"github.com/percona/pmm-managed/utils/logger"
-	"github.com/percona/pmm-managed/utils/tests"
+	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services/consul"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/utils/tests"
 )
 
 // TODO add RDS service

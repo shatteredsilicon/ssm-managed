@@ -22,7 +22,7 @@ import (
 
 	"gopkg.in/reform.v1"
 
-	"github.com/percona/pmm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/models"
 )
 
 // ServiceConfig contains configuration for remote.Service

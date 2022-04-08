@@ -19,9 +19,9 @@ package handlers
 import (
 	"context"
 
-	"github.com/percona/pmm-managed/api"
-	"github.com/percona/pmm-managed/services/remote"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/services/remote"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 // RemoteServer handles requests to return Remote nodes and services list.
