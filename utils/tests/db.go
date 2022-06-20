@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/percona/pmm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/models"
 )
 
 func OpenTestDB(t testing.TB) *sql.DB {

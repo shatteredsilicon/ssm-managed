@@ -30,7 +30,7 @@ import (
 	"testing"
 
 	"github.com/AlekSi/pointer"
-	"github.com/percona/pmm/proto"
+	"github.com/shatteredsilicon/ssm/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,12 +39,12 @@ import (
 	"gopkg.in/reform.v1"
 	"gopkg.in/reform.v1/dialects/mysql"
 
-	"github.com/percona/pmm-managed/models"
-	"github.com/percona/pmm-managed/services/mocks"
-	"github.com/percona/pmm-managed/services/prometheus"
-	"github.com/percona/pmm-managed/services/qan"
-	"github.com/percona/pmm-managed/utils/ports"
-	"github.com/percona/pmm-managed/utils/tests"
+	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services/mocks"
+	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
+	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/utils/ports"
+	"github.com/shatteredsilicon/ssm-managed/utils/tests"
 )
 
 func setup(t *testing.T) (context.Context, *Service, *sql.DB, []byte, string, *mocks.Supervisor, *httptest.Server) {

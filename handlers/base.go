@@ -20,7 +20,7 @@ package handlers
 import (
 	"golang.org/x/net/context"
 
-	"github.com/percona/pmm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/api"
 )
 
 type BaseServer struct {

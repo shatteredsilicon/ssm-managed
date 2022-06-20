@@ -11,7 +11,7 @@
 
 [[projects]]
   digest = "1:4362374738ba28a25378bcf08dc29d7e720ca214b2674b641dcaaa3320b2be19"
-  name = "github.com/Percona-Lab/promconfig"
+  name = "github.com/shatteredsilicon/promconfig"
   packages = [
     "common/config",
     "config",
@@ -517,7 +517,7 @@
 [[projects]]
   branch = "master"
   digest = "1:c244288746e1ecdcffcdf38f272cf9b70918df6714260991e4f704b42bb36a5f"
-  name = "github.com/percona/pmm"
+  name = "github.com/shatteredsilicon/ssm"
   packages = [
     "proto",
     "proto/config",
@@ -846,10 +846,10 @@
   analyzer-version = 1
   input-imports = [
     "github.com/AlekSi/pointer",
-    "github.com/Percona-Lab/promconfig/common/config",
-    "github.com/Percona-Lab/promconfig/config",
-    "github.com/Percona-Lab/promconfig/discovery/config",
-    "github.com/Percona-Lab/promconfig/discovery/targetgroup",
+    "github.com/shatteredsilicon/promconfig/common/config",
+    "github.com/shatteredsilicon/promconfig/config",
+    "github.com/shatteredsilicon/promconfig/discovery/config",
+    "github.com/shatteredsilicon/promconfig/discovery/targetgroup",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/awserr",
     "github.com/aws/aws-sdk-go/aws/credentials",
@@ -875,8 +875,8 @@
     "github.com/hashicorp/consul/api",
     "github.com/lib/pq",
     "github.com/percona/kardianos-service",
-    "github.com/percona/pmm/proto",
-    "github.com/percona/pmm/proto/config",
+    "github.com/shatteredsilicon/ssm/proto",
+    "github.com/shatteredsilicon/ssm/proto/config",
     "github.com/pkg/errors",
     "github.com/pmezard/go-difflib/difflib",
     "github.com/prometheus/client_golang/prometheus/promhttp",

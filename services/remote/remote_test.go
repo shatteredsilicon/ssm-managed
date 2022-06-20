@@ -31,12 +31,12 @@ import (
 	"gopkg.in/reform.v1"
 	"gopkg.in/reform.v1/dialects/mysql"
 
-	"github.com/percona/pmm-managed/models"
-	"github.com/percona/pmm-managed/services/mocks"
-	"github.com/percona/pmm-managed/services/postgresql"
-	"github.com/percona/pmm-managed/services/prometheus"
-	"github.com/percona/pmm-managed/utils/ports"
-	"github.com/percona/pmm-managed/utils/tests"
+	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services/mocks"
+	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
+	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
+	"github.com/shatteredsilicon/ssm-managed/utils/ports"
+	"github.com/shatteredsilicon/ssm-managed/utils/tests"
 )
 
 func setup(t *testing.T) (context.Context, *postgresql.Service, *Service, *sql.DB, []byte, string, *mocks.Supervisor) {

@@ -46,9 +46,9 @@ before_install:
 
   - protoc --version
 
-  - go get -u github.com/percona/mysqld_exporter
-  - go get -u github.com/percona/rds_exporter
-  - go get -u github.com/percona/postgres_exporter/...
+  - go get -u github.com/shatteredsilicon/mysqld_exporter
+  - go get -u github.com/shatteredsilicon/rds_exporter
+  - go get -u github.com/shatteredsilicon/postgres_exporter/...
 
 script:
   - sudo service mysql stop

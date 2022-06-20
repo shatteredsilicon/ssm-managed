@@ -29,9 +29,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Percona-Lab/promconfig/config"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
+	"github.com/shatteredsilicon/promconfig/config"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

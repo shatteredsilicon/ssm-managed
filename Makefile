@@ -33,7 +33,7 @@ test-race: install-race
 	go test -v -p 1 -race ./...
 
 cover: install
-	gocoverutil -ignore=github.com/percona/pmm-managed/api/... test -v -p 1 ./...
+	gocoverutil -ignore=github.com/shatteredsilicon/ssm-managed/api/... test -v -p 1 ./...
 
 check: install
 	golangci-lint run
@@ -69,7 +69,7 @@ gen:
 	swagger validate api/swagger/swagger.json
 	swagger generate client -f api/swagger/swagger.json -t api/swagger -A pmm-managed
 
-	go install -v github.com/percona/pmm-managed/api github.com/percona/pmm-managed/api/swagger/client
+	go install -v github.com/shatteredsilicon/ssm-managed/api github.com/shatteredsilicon/ssm-managed/api/swagger/client
 
 up:
 	docker-compose up --force-recreate --abort-on-container-exit --renew-anon-volumes --remove-orphans

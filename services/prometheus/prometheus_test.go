@@ -29,7 +29,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/percona/pmm-managed/utils/tests"
+	"github.com/shatteredsilicon/ssm-managed/utils/tests"
 )
 
 func TestPrometheusConfig(t *testing.T) {

@@ -11,15 +11,15 @@ import (
 
 	strfmt "github.com/go-openapi/strfmt"
 
-	"github.com/percona/pmm-managed/api/swagger/client/annotations"
-	"github.com/percona/pmm-managed/api/swagger/client/base"
-	"github.com/percona/pmm-managed/api/swagger/client/demo"
-	"github.com/percona/pmm-managed/api/swagger/client/logs"
-	"github.com/percona/pmm-managed/api/swagger/client/my_sql"
-	"github.com/percona/pmm-managed/api/swagger/client/postgre_sql"
-	"github.com/percona/pmm-managed/api/swagger/client/r_d_s"
-	"github.com/percona/pmm-managed/api/swagger/client/remote"
-	"github.com/percona/pmm-managed/api/swagger/client/scrape_configs"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/annotations"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/base"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/demo"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/logs"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/my_sql"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/postgre_sql"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/r_d_s"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/remote"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/scrape_configs"
 )
 
 // Default pmm managed HTTP client.

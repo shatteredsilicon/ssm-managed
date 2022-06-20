@@ -28,14 +28,14 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/Percona-Lab/promconfig/config"
 	"github.com/pkg/errors"
+	"github.com/shatteredsilicon/promconfig/config"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v2"
 
-	"github.com/percona/pmm-managed/services/consul"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/services/consul"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 var checkFailedRE = regexp.MustCompile(`FAILED: parsing YAML file \S+: (.+)\n`)

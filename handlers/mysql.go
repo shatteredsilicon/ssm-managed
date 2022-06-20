@@ -19,9 +19,9 @@ package handlers
 import (
 	"context"
 
-	"github.com/percona/pmm-managed/api"
-	"github.com/percona/pmm-managed/services/mysql"
-	"github.com/percona/pmm-managed/utils/logger"
+	"github.com/shatteredsilicon/ssm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/services/mysql"
+	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
 // MySQLServer handles requests to manage MySQL nodes and services.

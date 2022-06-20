@@ -19,8 +19,8 @@ package handlers
 import (
 	"context"
 
-	"github.com/percona/pmm-managed/api"
-	"github.com/percona/pmm-managed/services/grafana"
+	"github.com/shatteredsilicon/ssm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 )
 
 type AnnotationsServer struct {

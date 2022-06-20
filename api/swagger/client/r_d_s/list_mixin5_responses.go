@@ -13,7 +13,7 @@ import (
 
 	strfmt "github.com/go-openapi/strfmt"
 
-	models "github.com/percona/pmm-managed/api/swagger/models"
+	models "github.com/shatteredsilicon/ssm-managed/api/swagger/models"
 )
 
 // ListMixin5Reader is a Reader for the ListMixin5 structure.
