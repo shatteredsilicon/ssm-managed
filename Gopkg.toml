@@ -30,3 +30,11 @@ required = [
   # https://jira.percona.com/browse/PMM-1561
   name = "github.com/hashicorp/consul"
   version = "=0.8.5"
+
+[[override]]
+  name = "github.com/shatteredsilicon/promconfig"
+  branch = "master"
+
+[[override]]
+  name = "github.com/spf13/viper"
+  version = "=v1.1.1"
