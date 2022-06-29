@@ -84,12 +84,28 @@
   version = "v1.0.1"
 
 [[projects]]
+  digest = "1:bfc80ce9d6d6fae20395c779d8c0d6b7bb29fa399ed3a1f62d5403bc61a327eb"
+  name = "github.com/cespare/xxhash"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "e7a6b52374f7e2abfb8abb27249d53a1997b09a7"
+  version = "v2.1.2"
+
+[[projects]]
   digest = "1:9f42202ac457c462ad8bb9642806d275af9ab4850cf0b1960b9c6f083d4a309a"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   pruneopts = "T"
   revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
   version = "v1.1.1"
+
+[[projects]]
+  digest = "1:326938c8e0d8215755c86e58900818b5302a0d67dd2b007b03b26c3870287fd3"
+  name = "github.com/fatih/color"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "a05da93ebe62ca9fc6791d3376ec4dad01196448"
+  version = "v1.13.0"
 
 [[projects]]
   digest = "1:1ee4c991a1e40294f6ef7890d89e838865a3847d5d68979999f1cd7ce038119b"
@@ -307,12 +323,12 @@
   version = "v1.5.1"
 
 [[projects]]
-  digest = "1:87bf8ee866be36e40d8c51ced8cc04a2055732242739af7c704eff843bee1257"
+  digest = "1:49628f00461155f68308d97672e4345c78faa0bbde072c5a78f6bd92434297e9"
   name = "github.com/grpc-ecosystem/go-grpc-prometheus"
   packages = ["."]
   pruneopts = "T"
-  revision = "c225b8c3b01faf2899099b768856a9e916e5087b"
-  version = "v1.2.0"
+  revision = "6b7015e65d366bf3f19b2b2a000a831940f0f7e0"
+  version = "v1.1"
 
 [[projects]]
   digest = "1:25eb0e5aa51be700d08220c81936c930e0afcc1e8952d146f7df8d72e78cbe4b"
@@ -337,12 +353,12 @@
   version = "v1.16.0"
 
 [[projects]]
-  digest = "1:83a7165dd9d59cb0949543675bdf9f227198c547b198ab63245f324c6774be5e"
+  digest = "1:267f711e5cdbbe6c21771335d90574a24f82a750b013bc9e431bd3e731a25968"
   name = "github.com/hashicorp/consul"
   packages = ["api"]
   pruneopts = "T"
-  revision = "2c7715154d8d4568524b76d2d4deb7ca6fd1b285"
-  version = "v0.8.5"
+  revision = "66fb24ad933e7d9932f7a4bfc507968824a52bdc"
+  version = "v1.11.6"
 
 [[projects]]
   digest = "1:db1b20cbbb3ed54bc4780840fef2927541e2c8ed82dd116173190d79c3596577"
@@ -351,6 +367,14 @@
   pruneopts = "T"
   revision = "6d9e2ac5d828e5f8594b97f88c4bde14a67bb6d2"
   version = "v0.5.2"
+
+[[projects]]
+  digest = "1:fa65d10c9e7b1571b3ae7711036f3a936c64e9db99f864afc19e205ca414f548"
+  name = "github.com/hashicorp/go-hclog"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "fb7b65b200fe87c3aae8a4d92b099ad774d26fa8"
+  version = "v1.2.1"
 
 [[projects]]
   digest = "1:bc694f69b16c5bbf489f704ecb95f84b73c5dec6330b7fc06913dcda3edf2537"
@@ -483,6 +507,22 @@
   version = "v0.7.7"
 
 [[projects]]
+  digest = "1:7a5c4e52fe91f5336ef93e1147d5b0f47b2aa4d360753e3ca2113af1a02265ea"
+  name = "github.com/mattn/go-colorable"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "e1bb79c8d53c38a60962ad4b8f658226cc983710"
+  version = "v0.1.12"
+
+[[projects]]
+  digest = "1:e957136b907d35cedbe4c2bafce818366f728eb12da4dc2298edd612608532c0"
+  name = "github.com/mattn/go-isatty"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "504425e14f742f1f517c4586048b49b37f829c8e"
+  version = "v0.0.14"
+
+[[projects]]
   digest = "1:a8e3d14801bed585908d130ebfc3b925ba642208e6f30d879437ddfc7bb9b413"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
@@ -559,7 +599,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:f187ccbea8a6ab650f2a9a7ad613008f634a64a289e2707fe21f16c3d634f311"
+  digest = "1:ab544de2a7ac55e95eed8a9e8cff9fa8aa9dbac720028611fe51b6cbfcc1bee0"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
@@ -567,8 +607,8 @@
     "prometheus/promhttp",
   ]
   pruneopts = "T"
-  revision = "170205fb58decfd011f1550d4cfb737230d7ae4f"
-  version = "v1.1.0"
+  revision = "989baa30fe956631907493ccee1f8e7708660d96"
+  version = "v1.11.1"
 
 [[projects]]
   digest = "1:ade2df4d865299d2b042955eb4fdd9d60698b26cf3da10f1138a9bfefe9cd2c6"
@@ -579,7 +619,7 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:3c065cdd0b5f95f1b13f88b4f88a939299cb1ecaf2772f7c732f7eaefc39172a"
+  digest = "1:3794654acf8c5e2624fe467472cbb90e0e14076d21f0b74c0181d2ee20f01087"
   name = "github.com/prometheus/common"
   packages = [
     "expfmt",
@@ -587,8 +627,8 @@
     "model",
   ]
   pruneopts = "T"
-  revision = "26d49741eb3c6b0e69af1f9278688bf0eb6bef0b"
-  version = "v0.35.0"
+  revision = "0ec6a33fff8b8a6950b82f03c4bfabaf61ac4813"
+  version = "v0.26.0"
 
 [[projects]]
   digest = "1:7e01891dae6accf9342c64a7c257f5b14d2249dbb04bf3e1035e3beb6f5a9e38"
@@ -611,7 +651,7 @@
   version = "v1.8.1"
 
 [[projects]]
-  branch = "fix-name"
+  branch = "master"
   digest = "1:4569c65681106a3915f305aaf898abb702300865d572aeabfecac6a2cf6e92ef"
   name = "github.com/shatteredsilicon/promconfig"
   packages = [
@@ -633,7 +673,7 @@
     "util/yaml",
   ]
   pruneopts = "T"
-  revision = "4eb4fe59d02a99030df6e08a52e75ef9f5fb2393"
+  revision = "92898df3db18a178f9731d1d68fbbe7597a2c8a3"
 
 [[projects]]
   branch = "1.x"
@@ -1029,6 +1069,7 @@
     "github.com/aws/aws-sdk-go/aws/endpoints",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/rds",
+    "github.com/cespare/xxhash",
     "github.com/go-openapi/errors",
     "github.com/go-openapi/runtime",
     "github.com/go-openapi/runtime/client",
