@@ -10,7 +10,12 @@ required = [
   "github.com/golang/protobuf/protoc-gen-go",
   "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway",
   "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger",
-  "github.com/go-swagger/go-swagger/cmd/swagger"
+  "github.com/go-swagger/go-swagger/cmd/swagger",
+  'github.com/cespare/xxhash'
+]
+
+ignored = [
+  'github.com/cespare/xxhash/v2'
 ]
 
 [prune]
@@ -29,7 +34,11 @@ required = [
 [[constraint]]
   # https://jira.percona.com/browse/PMM-1561
   name = "github.com/hashicorp/consul"
-  version = "=0.8.5"
+  version = "~v1.11.5"
+
+[[constraint]]
+  name = 'github.com/cespare/xxhash'
+  version = "^2.1.2"
 
 [[override]]
   name = "github.com/shatteredsilicon/promconfig"
@@ -38,3 +47,15 @@ required = [
 [[override]]
   name = "github.com/spf13/viper"
   version = "=v1.1.1"
+
+[[override]]
+  name = 'github.com/prometheus/client_golang'
+  version = "~v1.11.1"
+
+[[override]]
+  name = 'github.com/prometheus/client_model'
+  version = "~v0.2.0"
+
+[[override]]
+  name = 'github.com/prometheus/common'
+  version = "~v0.26.0"
