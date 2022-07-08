@@ -84,8 +84,8 @@ func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, erro
 		return qanURL, nil
 	}
 
-	path = filepath.Join(svc.baseDir, "bin", "percona-qan-agent-installer")
-	args := []string{"-debug", "-hostname=pmm-server"}
+	path = filepath.Join(svc.baseDir, "bin", "ssm-qan-agent-installer")
+	args := []string{"-debug", "-hostname=ssm-server"}
 
 	if qanURL.User != nil && qanURL.User.Username() != "" {
 		args = append(args, "-server-user="+qanURL.User.Username())
@@ -134,7 +134,7 @@ func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor strin
 			Name:        nameForSupervisor,
 			DisplayName: nameForSupervisor,
 			Description: nameForSupervisor,
-			Executable:  filepath.Join(svc.baseDir, "bin", "percona-qan-agent"),
+			Executable:  filepath.Join(svc.baseDir, "bin", "ssm-qan-agent"),
 			Arguments: []string{
 				fmt.Sprintf("-listen=127.0.0.1:%d", port),
 			},
