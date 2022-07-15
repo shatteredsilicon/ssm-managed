@@ -48,7 +48,7 @@ func (x ScrapeTargetHealth_Health) String() string {
 	return proto.EnumName(ScrapeTargetHealth_Health_name, int32(x))
 }
 func (ScrapeTargetHealth_Health) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{5, 0}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{5, 0}
 }
 
 type LabelPair struct {
@@ -65,7 +65,7 @@ func (m *LabelPair) Reset()         { *m = LabelPair{} }
 func (m *LabelPair) String() string { return proto.CompactTextString(m) }
 func (*LabelPair) ProtoMessage()    {}
 func (*LabelPair) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{0}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{0}
 }
 func (m *LabelPair) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LabelPair.Unmarshal(m, b)
@@ -113,7 +113,7 @@ func (m *StaticConfig) Reset()         { *m = StaticConfig{} }
 func (m *StaticConfig) String() string { return proto.CompactTextString(m) }
 func (*StaticConfig) ProtoMessage()    {}
 func (*StaticConfig) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{1}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{1}
 }
 func (m *StaticConfig) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StaticConfig.Unmarshal(m, b)
@@ -159,7 +159,7 @@ func (m *BasicAuth) Reset()         { *m = BasicAuth{} }
 func (m *BasicAuth) String() string { return proto.CompactTextString(m) }
 func (*BasicAuth) ProtoMessage()    {}
 func (*BasicAuth) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{2}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{2}
 }
 func (m *BasicAuth) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BasicAuth.Unmarshal(m, b)
@@ -204,7 +204,7 @@ func (m *TLSConfig) Reset()         { *m = TLSConfig{} }
 func (m *TLSConfig) String() string { return proto.CompactTextString(m) }
 func (*TLSConfig) ProtoMessage()    {}
 func (*TLSConfig) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{3}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{3}
 }
 func (m *TLSConfig) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TLSConfig.Unmarshal(m, b)
@@ -257,7 +257,7 @@ func (m *ScrapeConfig) Reset()         { *m = ScrapeConfig{} }
 func (m *ScrapeConfig) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfig) ProtoMessage()    {}
 func (*ScrapeConfig) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{4}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{4}
 }
 func (m *ScrapeConfig) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfig.Unmarshal(m, b)
@@ -353,7 +353,7 @@ func (m *ScrapeTargetHealth) Reset()         { *m = ScrapeTargetHealth{} }
 func (m *ScrapeTargetHealth) String() string { return proto.CompactTextString(m) }
 func (*ScrapeTargetHealth) ProtoMessage()    {}
 func (*ScrapeTargetHealth) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{5}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{5}
 }
 func (m *ScrapeTargetHealth) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeTargetHealth.Unmarshal(m, b)
@@ -418,7 +418,7 @@ func (m *ScrapeConfigsListRequest) Reset()         { *m = ScrapeConfigsListReque
 func (m *ScrapeConfigsListRequest) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsListRequest) ProtoMessage()    {}
 func (*ScrapeConfigsListRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{6}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{6}
 }
 func (m *ScrapeConfigsListRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsListRequest.Unmarshal(m, b)
@@ -451,7 +451,7 @@ func (m *ScrapeConfigsListResponse) Reset()         { *m = ScrapeConfigsListResp
 func (m *ScrapeConfigsListResponse) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsListResponse) ProtoMessage()    {}
 func (*ScrapeConfigsListResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{7}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{7}
 }
 func (m *ScrapeConfigsListResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsListResponse.Unmarshal(m, b)
@@ -496,7 +496,7 @@ func (m *ScrapeConfigsGetRequest) Reset()         { *m = ScrapeConfigsGetRequest
 func (m *ScrapeConfigsGetRequest) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsGetRequest) ProtoMessage()    {}
 func (*ScrapeConfigsGetRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{8}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{8}
 }
 func (m *ScrapeConfigsGetRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsGetRequest.Unmarshal(m, b)
@@ -536,7 +536,7 @@ func (m *ScrapeConfigsGetResponse) Reset()         { *m = ScrapeConfigsGetRespon
 func (m *ScrapeConfigsGetResponse) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsGetResponse) ProtoMessage()    {}
 func (*ScrapeConfigsGetResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{9}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{9}
 }
 func (m *ScrapeConfigsGetResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsGetResponse.Unmarshal(m, b)
@@ -583,7 +583,7 @@ func (m *ScrapeConfigsCreateRequest) Reset()         { *m = ScrapeConfigsCreateR
 func (m *ScrapeConfigsCreateRequest) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsCreateRequest) ProtoMessage()    {}
 func (*ScrapeConfigsCreateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{10}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{10}
 }
 func (m *ScrapeConfigsCreateRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsCreateRequest.Unmarshal(m, b)
@@ -627,7 +627,7 @@ func (m *ScrapeConfigsCreateResponse) Reset()         { *m = ScrapeConfigsCreate
 func (m *ScrapeConfigsCreateResponse) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsCreateResponse) ProtoMessage()    {}
 func (*ScrapeConfigsCreateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{11}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{11}
 }
 func (m *ScrapeConfigsCreateResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsCreateResponse.Unmarshal(m, b)
@@ -660,7 +660,7 @@ func (m *ScrapeConfigsUpdateRequest) Reset()         { *m = ScrapeConfigsUpdateR
 func (m *ScrapeConfigsUpdateRequest) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsUpdateRequest) ProtoMessage()    {}
 func (*ScrapeConfigsUpdateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{12}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{12}
 }
 func (m *ScrapeConfigsUpdateRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsUpdateRequest.Unmarshal(m, b)
@@ -704,7 +704,7 @@ func (m *ScrapeConfigsUpdateResponse) Reset()         { *m = ScrapeConfigsUpdate
 func (m *ScrapeConfigsUpdateResponse) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsUpdateResponse) ProtoMessage()    {}
 func (*ScrapeConfigsUpdateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{13}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{13}
 }
 func (m *ScrapeConfigsUpdateResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsUpdateResponse.Unmarshal(m, b)
@@ -735,7 +735,7 @@ func (m *ScrapeConfigsDeleteRequest) Reset()         { *m = ScrapeConfigsDeleteR
 func (m *ScrapeConfigsDeleteRequest) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsDeleteRequest) ProtoMessage()    {}
 func (*ScrapeConfigsDeleteRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{14}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{14}
 }
 func (m *ScrapeConfigsDeleteRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsDeleteRequest.Unmarshal(m, b)
@@ -772,7 +772,7 @@ func (m *ScrapeConfigsDeleteResponse) Reset()         { *m = ScrapeConfigsDelete
 func (m *ScrapeConfigsDeleteResponse) String() string { return proto.CompactTextString(m) }
 func (*ScrapeConfigsDeleteResponse) ProtoMessage()    {}
 func (*ScrapeConfigsDeleteResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_scrape_configs_62bf05e6659ff558, []int{15}
+	return fileDescriptor_scrape_configs_7f58703015052f2f, []int{15}
 }
 func (m *ScrapeConfigsDeleteResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ScrapeConfigsDeleteResponse.Unmarshal(m, b)
@@ -1043,10 +1043,10 @@ var _ScrapeConfigs_serviceDesc = grpc.ServiceDesc{
 }
 
 func init() {
-	proto.RegisterFile("scrape_configs.proto", fileDescriptor_scrape_configs_62bf05e6659ff558)
+	proto.RegisterFile("scrape_configs.proto", fileDescriptor_scrape_configs_7f58703015052f2f)
 }
 
-var fileDescriptor_scrape_configs_62bf05e6659ff558 = []byte{
+var fileDescriptor_scrape_configs_7f58703015052f2f = []byte{
 	// 858 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xc4, 0x56, 0xdd, 0x8e, 0xdb, 0x44,
 	0x14, 0xc6, 0x49, 0xea, 0x8d, 0xcf, 0xfe, 0xb0, 0x1d, 0x02, 0xeb, 0x9a, 0xa6, 0x0d, 0x96, 0x4a,

@@ -258,6 +258,75 @@ var (
 	_ fmt.Stringer  = (*RDSService)(nil)
 )
 
+type rDSServiceDetailViewType struct {
+	s parse.StructInfo
+	z []interface{}
+}
+
+// Schema returns a schema name in SQL database ("").
+func (v *rDSServiceDetailViewType) Schema() string {
+	return v.s.SQLSchema
+}
+
+// Name returns a view or table name in SQL database ("services").
+func (v *rDSServiceDetailViewType) Name() string {
+	return v.s.SQLName
+}
+
+// Columns returns a new slice of column names for that view or table in SQL database.
+func (v *rDSServiceDetailViewType) Columns() []string {
+	return []string{"region", "instance"}
+}
+
+// NewStruct makes a new struct for that view or table.
+func (v *rDSServiceDetailViewType) NewStruct() reform.Struct {
+	return new(RDSServiceDetail)
+}
+
+// RDSServiceDetailView represents services view or table in SQL database.
+var RDSServiceDetailView = &rDSServiceDetailViewType{
+	s: parse.StructInfo{Type: "RDSServiceDetail", SQLSchema: "", SQLName: "services", Fields: []parse.FieldInfo{{Name: "Region", Type: "string", Column: "region"}, {Name: "Instance", Type: "string", Column: "instance"}}, PKFieldIndex: -1},
+	z: new(RDSServiceDetail).Values(),
+}
+
+// String returns a string representation of this struct or record.
+func (s RDSServiceDetail) String() string {
+	res := make([]string, 2)
+	res[0] = "Region: " + reform.Inspect(s.Region, true)
+	res[1] = "Instance: " + reform.Inspect(s.Instance, true)
+	return strings.Join(res, ", ")
+}
+
+// Values returns a slice of struct or record field values.
+// Returned interface{} values are never untyped nils.
+func (s *RDSServiceDetail) Values() []interface{} {
+	return []interface{}{
+		s.Region,
+		s.Instance,
+	}
+}
+
+// Pointers returns a slice of pointers to struct or record fields.
+// Returned interface{} values are never untyped nils.
+func (s *RDSServiceDetail) Pointers() []interface{} {
+	return []interface{}{
+		&s.Region,
+		&s.Instance,
+	}
+}
+
+// View returns View object for that struct.
+func (s *RDSServiceDetail) View() reform.View {
+	return RDSServiceDetailView
+}
+
+// check interfaces
+var (
+	_ reform.View   = RDSServiceDetailView
+	_ reform.Struct = (*RDSServiceDetail)(nil)
+	_ fmt.Stringer  = (*RDSServiceDetail)(nil)
+)
+
 type postgreSQLServiceTableType struct {
 	s parse.StructInfo
 	z []interface{}
@@ -642,6 +711,7 @@ var (
 func init() {
 	parse.AssertUpToDate(&ServiceTable.s, new(Service))
 	parse.AssertUpToDate(&RDSServiceTable.s, new(RDSService))
+	parse.AssertUpToDate(&RDSServiceDetailView.s, new(RDSServiceDetail))
 	parse.AssertUpToDate(&PostgreSQLServiceTable.s, new(PostgreSQLService))
 	parse.AssertUpToDate(&MySQLServiceTable.s, new(MySQLService))
 	parse.AssertUpToDate(&RemoteServiceTable.s, new(RemoteService))

@@ -45,7 +45,7 @@ const (
 
 // NameForSupervisor returns a name of agent for supervisor.
 func NameForSupervisor(typ AgentType, listenPort uint16) string {
-	return fmt.Sprintf("pmm-%s-%d", typ, listenPort)
+	return fmt.Sprintf("ssm-%s-%d", typ, listenPort)
 }
 
 //reform:agents

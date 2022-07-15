@@ -35,7 +35,7 @@ func (m *PostgreSQLNode) Reset()         { *m = PostgreSQLNode{} }
 func (m *PostgreSQLNode) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLNode) ProtoMessage()    {}
 func (*PostgreSQLNode) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{0}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{0}
 }
 func (m *PostgreSQLNode) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLNode.Unmarshal(m, b)
@@ -76,7 +76,7 @@ func (m *PostgreSQLService) Reset()         { *m = PostgreSQLService{} }
 func (m *PostgreSQLService) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLService) ProtoMessage()    {}
 func (*PostgreSQLService) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{1}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{1}
 }
 func (m *PostgreSQLService) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLService.Unmarshal(m, b)
@@ -136,7 +136,7 @@ func (m *PostgreSQLInstance) Reset()         { *m = PostgreSQLInstance{} }
 func (m *PostgreSQLInstance) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLInstance) ProtoMessage()    {}
 func (*PostgreSQLInstance) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{2}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{2}
 }
 func (m *PostgreSQLInstance) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLInstance.Unmarshal(m, b)
@@ -180,7 +180,7 @@ func (m *PostgreSQLListRequest) Reset()         { *m = PostgreSQLListRequest{} }
 func (m *PostgreSQLListRequest) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLListRequest) ProtoMessage()    {}
 func (*PostgreSQLListRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{3}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{3}
 }
 func (m *PostgreSQLListRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLListRequest.Unmarshal(m, b)
@@ -211,7 +211,7 @@ func (m *PostgreSQLListResponse) Reset()         { *m = PostgreSQLListResponse{}
 func (m *PostgreSQLListResponse) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLListResponse) ProtoMessage()    {}
 func (*PostgreSQLListResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{4}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{4}
 }
 func (m *PostgreSQLListResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLListResponse.Unmarshal(m, b)
@@ -253,7 +253,7 @@ func (m *PostgreSQLAddRequest) Reset()         { *m = PostgreSQLAddRequest{} }
 func (m *PostgreSQLAddRequest) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLAddRequest) ProtoMessage()    {}
 func (*PostgreSQLAddRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{5}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{5}
 }
 func (m *PostgreSQLAddRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLAddRequest.Unmarshal(m, b)
@@ -319,7 +319,7 @@ func (m *PostgreSQLAddResponse) Reset()         { *m = PostgreSQLAddResponse{} }
 func (m *PostgreSQLAddResponse) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLAddResponse) ProtoMessage()    {}
 func (*PostgreSQLAddResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{6}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{6}
 }
 func (m *PostgreSQLAddResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLAddResponse.Unmarshal(m, b)
@@ -357,7 +357,7 @@ func (m *PostgreSQLRemoveRequest) Reset()         { *m = PostgreSQLRemoveRequest
 func (m *PostgreSQLRemoveRequest) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLRemoveRequest) ProtoMessage()    {}
 func (*PostgreSQLRemoveRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{7}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{7}
 }
 func (m *PostgreSQLRemoveRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLRemoveRequest.Unmarshal(m, b)
@@ -394,7 +394,7 @@ func (m *PostgreSQLRemoveResponse) Reset()         { *m = PostgreSQLRemoveRespon
 func (m *PostgreSQLRemoveResponse) String() string { return proto.CompactTextString(m) }
 func (*PostgreSQLRemoveResponse) ProtoMessage()    {}
 func (*PostgreSQLRemoveResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_postgresql_1f3feebc0db14cd3, []int{8}
+	return fileDescriptor_postgresql_c9b81e8e177606da, []int{8}
 }
 func (m *PostgreSQLRemoveResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PostgreSQLRemoveResponse.Unmarshal(m, b)
@@ -564,9 +564,9 @@ var _PostgreSQL_serviceDesc = grpc.ServiceDesc{
 	Metadata: "postgresql.proto",
 }
 
-func init() { proto.RegisterFile("postgresql.proto", fileDescriptor_postgresql_1f3feebc0db14cd3) }
+func init() { proto.RegisterFile("postgresql.proto", fileDescriptor_postgresql_c9b81e8e177606da) }
 
-var fileDescriptor_postgresql_1f3feebc0db14cd3 = []byte{
+var fileDescriptor_postgresql_c9b81e8e177606da = []byte{
 	// 497 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x53, 0x4b, 0x6e, 0xdb, 0x30,
 	0x10, 0x05, 0x25, 0xc5, 0x9f, 0x09, 0x62, 0xa8, 0x74, 0x63, 0x33, 0x4a, 0x0a, 0x18, 0x04, 0x8a,

@@ -35,7 +35,7 @@ func (m *MySQLNode) Reset()         { *m = MySQLNode{} }
 func (m *MySQLNode) String() string { return proto.CompactTextString(m) }
 func (*MySQLNode) ProtoMessage()    {}
 func (*MySQLNode) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{0}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{0}
 }
 func (m *MySQLNode) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLNode.Unmarshal(m, b)
@@ -76,7 +76,7 @@ func (m *MySQLService) Reset()         { *m = MySQLService{} }
 func (m *MySQLService) String() string { return proto.CompactTextString(m) }
 func (*MySQLService) ProtoMessage()    {}
 func (*MySQLService) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{1}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{1}
 }
 func (m *MySQLService) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLService.Unmarshal(m, b)
@@ -136,7 +136,7 @@ func (m *MySQLInstance) Reset()         { *m = MySQLInstance{} }
 func (m *MySQLInstance) String() string { return proto.CompactTextString(m) }
 func (*MySQLInstance) ProtoMessage()    {}
 func (*MySQLInstance) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{2}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{2}
 }
 func (m *MySQLInstance) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLInstance.Unmarshal(m, b)
@@ -180,7 +180,7 @@ func (m *MySQLListRequest) Reset()         { *m = MySQLListRequest{} }
 func (m *MySQLListRequest) String() string { return proto.CompactTextString(m) }
 func (*MySQLListRequest) ProtoMessage()    {}
 func (*MySQLListRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{3}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{3}
 }
 func (m *MySQLListRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLListRequest.Unmarshal(m, b)
@@ -211,7 +211,7 @@ func (m *MySQLListResponse) Reset()         { *m = MySQLListResponse{} }
 func (m *MySQLListResponse) String() string { return proto.CompactTextString(m) }
 func (*MySQLListResponse) ProtoMessage()    {}
 func (*MySQLListResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{4}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{4}
 }
 func (m *MySQLListResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLListResponse.Unmarshal(m, b)
@@ -253,7 +253,7 @@ func (m *MySQLAddRequest) Reset()         { *m = MySQLAddRequest{} }
 func (m *MySQLAddRequest) String() string { return proto.CompactTextString(m) }
 func (*MySQLAddRequest) ProtoMessage()    {}
 func (*MySQLAddRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{5}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{5}
 }
 func (m *MySQLAddRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLAddRequest.Unmarshal(m, b)
@@ -319,7 +319,7 @@ func (m *MySQLAddResponse) Reset()         { *m = MySQLAddResponse{} }
 func (m *MySQLAddResponse) String() string { return proto.CompactTextString(m) }
 func (*MySQLAddResponse) ProtoMessage()    {}
 func (*MySQLAddResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{6}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{6}
 }
 func (m *MySQLAddResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLAddResponse.Unmarshal(m, b)
@@ -357,7 +357,7 @@ func (m *MySQLRemoveRequest) Reset()         { *m = MySQLRemoveRequest{} }
 func (m *MySQLRemoveRequest) String() string { return proto.CompactTextString(m) }
 func (*MySQLRemoveRequest) ProtoMessage()    {}
 func (*MySQLRemoveRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{7}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{7}
 }
 func (m *MySQLRemoveRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLRemoveRequest.Unmarshal(m, b)
@@ -394,7 +394,7 @@ func (m *MySQLRemoveResponse) Reset()         { *m = MySQLRemoveResponse{} }
 func (m *MySQLRemoveResponse) String() string { return proto.CompactTextString(m) }
 func (*MySQLRemoveResponse) ProtoMessage()    {}
 func (*MySQLRemoveResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_mysql_52b8f1c6fff1bd63, []int{8}
+	return fileDescriptor_mysql_8c363b670a14048a, []int{8}
 }
 func (m *MySQLRemoveResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MySQLRemoveResponse.Unmarshal(m, b)
@@ -564,9 +564,9 @@ var _MySQL_serviceDesc = grpc.ServiceDesc{
 	Metadata: "mysql.proto",
 }
 
-func init() { proto.RegisterFile("mysql.proto", fileDescriptor_mysql_52b8f1c6fff1bd63) }
+func init() { proto.RegisterFile("mysql.proto", fileDescriptor_mysql_8c363b670a14048a) }
 
-var fileDescriptor_mysql_52b8f1c6fff1bd63 = []byte{
+var fileDescriptor_mysql_8c363b670a14048a = []byte{
 	// 487 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x53, 0x4d, 0x6f, 0xd3, 0x40,
 	0x10, 0xd5, 0xda, 0xce, 0x87, 0x27, 0xc4, 0x38, 0x4b, 0x13, 0x56, 0x16, 0x87, 0x68, 0x05, 0x52,

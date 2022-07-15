@@ -22,7 +22,7 @@ type NodeType string
 
 // Node types
 const (
-	PMMServerNodeType NodeType = "pmm-server"
+	PMMServerNodeType NodeType = "ssm-server"
 	RDSNodeType       NodeType = "rds"
 	RemoteNodeType    NodeType = "remote"
 )

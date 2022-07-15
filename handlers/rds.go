@@ -106,6 +106,23 @@ func (s *RDSServer) Remove(ctx context.Context, req *api.RDSRemoveRequest) (*api
 	return &resp, nil
 }
 
+// Detail handles fetching rds detail api
+func (s *RDSServer) Detail(ctx context.Context, req *api.RDSDetailRequest) (*api.RDSDetailResponse, error) {
+	svc, err := s.RDS.GetDBService(ctx, req.QanDbInstanceUuid)
+	if err != nil {
+		logger.Get(ctx).Errorf("%+v", err)
+		return nil, err
+	}
+
+	resp := api.RDSDetailResponse{
+		AwsAccessKeyId:     *svc.AWSAccessKey,
+		AwsSecretAccessKey: *svc.AWSSecretKey,
+		Region:             svc.Region,
+		Instance:           svc.Instance,
+	}
+	return &resp, nil
+}
+
 // check interfaces
 var (
 	_ api.RDSServer = (*RDSServer)(nil)

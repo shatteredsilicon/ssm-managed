@@ -48,6 +48,13 @@ type RDSService struct {
 }
 
 //reform:services
+type RDSServiceDetail struct {
+	RDSService
+	Region   string `reform:"region"`
+	Instance string `reform:"instance"`
+}
+
+//reform:services
 type PostgreSQLService struct {
 	ID     int32       `reform:"id,pk"`
 	Type   ServiceType `reform:"type"`

@@ -45,6 +45,10 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
+const (
+	managedAPIPath = "managed"
+)
+
 type Service struct {
 	baseDir    string
 	supervisor services.Supervisor
@@ -85,7 +89,7 @@ func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, erro
 	}
 
 	path = filepath.Join(svc.baseDir, "bin", "ssm-qan-agent-installer")
-	args := []string{"-debug", "-hostname=ssm-server"}
+	args := []string{"-debug", "-hostname=ssm-server", "-managed-api-path", managedAPIPath}
 
 	if qanURL.User != nil && qanURL.User.Username() != "" {
 		args = append(args, "-server-user="+qanURL.User.Username())
@@ -512,7 +516,7 @@ func (svc *Service) removeInstanceFromServer(ctx context.Context, qanURL *url.UR
 
 func (svc *Service) sendQANCommand(ctx context.Context, qanURL *url.URL, agentUUID string, command string, data []byte) error {
 	cmd := proto.Cmd{
-		User:      "pmm-managed",
+		User:      "ssm-managed",
 		AgentUUID: agentUUID,
 		Service:   "qan",
 		Cmd:       command,

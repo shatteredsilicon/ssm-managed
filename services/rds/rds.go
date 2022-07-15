@@ -400,6 +400,24 @@ func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 	return res, err
 }
 
+// GetDBService retrieve a rds service record with qan_db_instance_id
+func (svc *Service) GetDBService(ctx context.Context, uuid string) (*models.RDSServiceDetail, error) {
+	var s models.RDSServiceDetail
+	err := svc.DB.QueryRow(fmt.Sprintf(`
+		SELECT s.id, s.type, s.node_id, s.aws_access_key, s.aws_secret_key,
+			s.address, s.port, s.engine, s.engine_version, n.region, n.name AS instance
+		FROM %s a
+		JOIN %s ags ON a.id = ags.agent_id
+		JOIN %s s ON ags.service_id = s.id
+		JOIN %s n ON s.node_id = n.id
+		WHERE a.qan_db_instance_uuid = ?
+	`, models.AgentTable.Name(), models.AgentServiceView.Name(), models.ServiceTable.Name(), models.NodeTable.Name()), uuid).Scan(
+		&s.ID, &s.Type, &s.NodeID, &s.AWSAccessKey, &s.AWSSecretKey,
+		&s.Address, &s.Port, &s.Engine, &s.EngineVersion, &s.Region, &s.Instance,
+	)
+	return &s, err
+}
+
 func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, service *models.RDSService, username, password string) error {
 	// insert mysqld_exporter agent and association
 	port, err := svc.PortsRegistry.Reserve()

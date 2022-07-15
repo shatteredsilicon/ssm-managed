@@ -174,10 +174,10 @@ func TestAddListRemove(t *testing.T) {
 	supervisor.On("Start", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Status", mock.Anything, mock.Anything).Return(fmt.Errorf("not running"))
 	supervisor.On("Stop", mock.Anything, mock.Anything).Return(nil)
-	id, err := svc.Add(ctx, "", "localhost", 0, "pmm-managed", "pmm-managed")
+	id, err := svc.Add(ctx, "", "localhost", 0, "ssm-managed", "ssm-managed")
 	assert.NoError(t, err)
 
-	_, err = svc.Add(ctx, "", "localhost", 3306, "pmm-managed", "pmm-managed")
+	_, err = svc.Add(ctx, "", "localhost", 3306, "ssm-managed", "ssm-managed")
 	tests.AssertGRPCError(t, status.New(codes.AlreadyExists, `MySQL instance "localhost" already exists.`), err)
 
 	actual, err = svc.List(ctx)
