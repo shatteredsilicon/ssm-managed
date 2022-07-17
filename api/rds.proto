@@ -20,6 +20,10 @@ message RDSService {
     string engine_version = 7;
 }
 
+message RDSAgent {
+    string qan_db_instance_uuid = 1;
+}
+
 message RDSInstanceID {
     string region = 1;
     string name = 2;
@@ -28,6 +32,7 @@ message RDSInstanceID {
 message RDSInstance {
     RDSNode node = 1;
     RDSService service = 2;
+    RDSAgent agent = 3;
 }
 
 message RDSDiscoverRequest {

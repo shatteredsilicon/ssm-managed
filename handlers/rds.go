@@ -62,7 +62,7 @@ func (s *RDSServer) List(ctx context.Context, req *api.RDSListRequest) (*api.RDS
 
 	var resp api.RDSListResponse
 	for _, db := range res {
-		resp.Instances = append(resp.Instances, &api.RDSInstance{
+		in := &api.RDSInstance{
 			Node: &api.RDSNode{
 				Name:   db.Node.Name,
 				Region: db.Node.Region,
@@ -73,7 +73,13 @@ func (s *RDSServer) List(ctx context.Context, req *api.RDSListRequest) (*api.RDS
 				Engine:        *db.Service.Engine,
 				EngineVersion: *db.Service.EngineVersion,
 			},
-		})
+		}
+		if db.Agent != nil && db.Agent.QanDBInstanceUUID != nil {
+			in.Agent = &api.RDSAgent{
+				QanDbInstanceUuid: *db.Agent.QanDBInstanceUUID,
+			}
+		}
+		resp.Instances = append(resp.Instances, in)
 	}
 	return &resp, nil
 }

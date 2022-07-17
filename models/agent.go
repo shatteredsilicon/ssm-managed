@@ -50,9 +50,10 @@ func NameForSupervisor(typ AgentType, listenPort uint16) string {
 
 //reform:agents
 type Agent struct {
-	ID           int32     `reform:"id,pk"`
-	Type         AgentType `reform:"type"`
-	RunsOnNodeID int32     `reform:"runs_on_node_id"`
+	ID                int32     `reform:"id,pk"`
+	Type              AgentType `reform:"type"`
+	RunsOnNodeID      int32     `reform:"runs_on_node_id"`
+	QanDBInstanceUUID *string   `reform:"qan_db_instance_uuid"`
 
 	// TODO Does it really belong there? Remove when we have agent without one.
 	ListenPort *uint16 `reform:"listen_port"`

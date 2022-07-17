@@ -166,6 +166,14 @@
     "apiRDSAddResponse": {
       "type": "object"
     },
+    "apiRDSAgent": {
+      "type": "object",
+      "properties": {
+        "qan_db_instance_uuid": {
+          "type": "string"
+        }
+      }
+    },
     "apiRDSDetailResponse": {
       "type": "object",
       "properties": {
@@ -213,6 +221,9 @@
         },
         "service": {
           "$ref": "#/definitions/apiRDSService"
+        },
+        "agent": {
+          "$ref": "#/definitions/apiRDSAgent"
         }
       }
     },

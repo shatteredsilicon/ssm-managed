@@ -126,6 +126,7 @@ type InstanceID struct {
 type Instance struct {
 	Node    models.RDSNode
 	Service models.RDSService
+	Agent   *models.Agent
 }
 
 func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.Querier) error {
@@ -385,13 +386,34 @@ func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 			services[i] = *str.(*models.RDSService)
 		}
 
+		structs, e = tx.SelectAllFrom(models.AgentServiceView, "")
+		serviceAgents := make(map[int32]int32)
+		for _, str := range structs {
+			agentService := *str.(*models.AgentService)
+			serviceAgents[agentService.ServiceID] = agentService.AgentID
+		}
+
+		structs, e = tx.SelectAllFrom(models.AgentTable, "")
+		agents := make(map[int32]models.Agent)
+		for _, str := range structs {
+			a := *str.(*models.Agent)
+			agents[a.ID] = a
+		}
+
 		for _, node := range nodes {
 			for _, service := range services {
 				if node.ID == service.NodeID {
-					res = append(res, Instance{
+					in := Instance{
 						Node:    node,
 						Service: service,
-					})
+					}
+					if sa, ok := serviceAgents[service.ID]; ok {
+						if a, ok := agents[sa]; ok {
+							in.Agent = &a
+						}
+					}
+
+					res = append(res, in)
 				}
 			}
 		}
