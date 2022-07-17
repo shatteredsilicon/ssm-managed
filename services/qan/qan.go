@@ -46,7 +46,8 @@ import (
 )
 
 const (
-	managedAPIPath = "managed"
+	managedAPIPath     = "managed"
+	defaultCollectFrom = "rds-slowlog"
 )
 
 type Service struct {
@@ -625,7 +626,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	command := "StartTool"
 	config := map[string]interface{}{
 		"UUID":           instance.UUID,
-		"CollectFrom":    "perfschema",
+		"CollectFrom":    defaultCollectFrom,
 		"Interval":       60,
 		"ExampleQueries": true,
 	}
