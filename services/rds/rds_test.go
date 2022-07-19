@@ -104,7 +104,7 @@ func setup(t *testing.T) (context.Context, *Service, *sql.DB, []byte, string, *m
 
 	require.NoError(t, os.Setenv("PMM_QAN_API_URL", ts.URL))
 
-	// We can't/shouldn't use /usr/local/percona/ (the default basedir), so use
+	// We can't/shouldn't use /opt/ss/ (the default basedir), so use
 	// a tmpdir instead with roughly the same, fake structure.
 	rootDir, err := ioutil.TempDir("/tmp", "pmm-managed-test-rootdir-")
 	assert.Nil(t, err)
@@ -117,8 +117,8 @@ func setup(t *testing.T) (context.Context, *Service, *sql.DB, []byte, string, *m
 	os.MkdirAll(filepath.Join(rootDir, "etc"), 0777)
 	err = ioutil.WriteFile(rdsExporterConfigPath, []byte(`---`), 0666)
 	require.Nil(t, err)
-	createFakeBin(t, filepath.Join(rootDir, "bin/percona-qan-agent"))
-	createFakeBin(t, filepath.Join(rootDir, "bin/percona-qan-agent-installer"))
+	createFakeBin(t, filepath.Join(rootDir, "bin/ssm-qan-agent"))
+	createFakeBin(t, filepath.Join(rootDir, "bin/ssm-qan-agent-installer"))
 	os.MkdirAll(filepath.Join(rootDir, "config"), 0777)
 	os.MkdirAll(filepath.Join(rootDir, "instance"), 0777)
 	err = ioutil.WriteFile(filepath.Join(rootDir, "config/agent.conf"), []byte(`{"UUID":"42","ApiHostname":"somehostname","ApiPath":"/qan-api","ServerUser":"pmm"}`), 0666)

@@ -75,8 +75,8 @@ var defaultLogs = []Log{
 	{logsRootDir + "nginx/error.log", "", nil},
 	{logsRootDir + "node_exporter.log", "node_exporter", nil},
 	{logsRootDir + "orchestrator.log", "orchestrator", nil},
-	{logsRootDir + "pmm-manage.log", "pmm-manage", nil},
-	{logsRootDir + "pmm-managed.log", "pmm-managed", nil},
+	{logsRootDir + "ssm-manage.log", "ssm-manage", nil},
+	{logsRootDir + "ssm-managed.log", "ssm-managed", nil},
 	{logsRootDir + "prometheus1.log", "prometheus1", nil},
 	{logsRootDir + "prometheus.log", "prometheus", nil},
 	{logsRootDir + "qan-api.log", "percona-qan-api", nil},
@@ -91,13 +91,13 @@ var defaultLogs = []Log{
 	// configs
 	// TODO handle separately
 	{"/etc/prometheus.yml", "", []string{"cat", ""}},
-	{"/etc/supervisord.d/pmm.ini", "", []string{"cat", ""}},
-	{"/etc/nginx/conf.d/pmm.conf", "", []string{"cat", ""}},
+	{"/etc/supervisord.d/ssm.ini", "", []string{"cat", ""}},
+	{"/etc/nginx/conf.d/ssm.conf", "", []string{"cat", ""}},
 	{"prometheus_targets.html", "", []string{"http", "http://localhost/prometheus/targets"}},
 	{"consul_nodes.json", "", []string{"consul"}},
 	{"qan-api_instances.json", "", []string{"http", "http://localhost/qan-api/instances"}},
 	{"managed_RDS-Aurora.json", "", []string{"rds"}},
-	{"pmm-version.txt", "", []string{"pmmVersion", ""}},
+	{"ssm-version.txt", "", []string{"pmmVersion", ""}},
 }
 
 // Logs is responsible for interactions with logs.
@@ -121,7 +121,7 @@ type manageConfig struct {
 // getCredential fetchs PMM credential
 func getCredential() (string, error) {
 	var u string
-	f, err := os.Open("/srv/update/pmm-manage.yml")
+	f, err := os.Open("/srv/update/ssm-manage.yml")
 	if err != nil {
 		return u, err
 	}

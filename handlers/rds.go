@@ -62,7 +62,7 @@ func (s *RDSServer) List(ctx context.Context, req *api.RDSListRequest) (*api.RDS
 
 	var resp api.RDSListResponse
 	for _, db := range res {
-		resp.Instances = append(resp.Instances, &api.RDSInstance{
+		in := &api.RDSInstance{
 			Node: &api.RDSNode{
 				Name:   db.Node.Name,
 				Region: db.Node.Region,
@@ -73,7 +73,13 @@ func (s *RDSServer) List(ctx context.Context, req *api.RDSListRequest) (*api.RDS
 				Engine:        *db.Service.Engine,
 				EngineVersion: *db.Service.EngineVersion,
 			},
-		})
+		}
+		if db.Agent != nil && db.Agent.QanDBInstanceUUID != nil {
+			in.Agent = &api.RDSAgent{
+				QanDbInstanceUuid: *db.Agent.QanDBInstanceUUID,
+			}
+		}
+		resp.Instances = append(resp.Instances, in)
 	}
 	return &resp, nil
 }
@@ -103,6 +109,23 @@ func (s *RDSServer) Remove(ctx context.Context, req *api.RDSRemoveRequest) (*api
 	}
 
 	var resp api.RDSRemoveResponse
+	return &resp, nil
+}
+
+// Detail handles fetching rds detail api
+func (s *RDSServer) Detail(ctx context.Context, req *api.RDSDetailRequest) (*api.RDSDetailResponse, error) {
+	svc, err := s.RDS.GetDBService(ctx, req.QanDbInstanceUuid)
+	if err != nil {
+		logger.Get(ctx).Errorf("%+v", err)
+		return nil, err
+	}
+
+	resp := api.RDSDetailResponse{
+		AwsAccessKeyId:     *svc.AWSAccessKey,
+		AwsSecretAccessKey: *svc.AWSSecretKey,
+		Region:             svc.Region,
+		Instance:           svc.Instance,
+	}
 	return &resp, nil
 }
 

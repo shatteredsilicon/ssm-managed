@@ -45,6 +45,11 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
+const (
+	managedAPIPath     = "managed"
+	defaultCollectFrom = "rds-slowlog"
+)
+
 type Service struct {
 	baseDir    string
 	supervisor services.Supervisor
@@ -84,8 +89,8 @@ func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, erro
 		return qanURL, nil
 	}
 
-	path = filepath.Join(svc.baseDir, "bin", "percona-qan-agent-installer")
-	args := []string{"-debug", "-hostname=pmm-server"}
+	path = filepath.Join(svc.baseDir, "bin", "ssm-qan-agent-installer")
+	args := []string{"-debug", "-hostname=ssm-server", "-managed-api-path", managedAPIPath}
 
 	if qanURL.User != nil && qanURL.User.Username() != "" {
 		args = append(args, "-server-user="+qanURL.User.Username())
@@ -134,7 +139,7 @@ func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor strin
 			Name:        nameForSupervisor,
 			DisplayName: nameForSupervisor,
 			Description: nameForSupervisor,
-			Executable:  filepath.Join(svc.baseDir, "bin", "percona-qan-agent"),
+			Executable:  filepath.Join(svc.baseDir, "bin", "ssm-qan-agent"),
 			Arguments: []string{
 				fmt.Sprintf("-listen=127.0.0.1:%d", port),
 			},
@@ -512,7 +517,7 @@ func (svc *Service) removeInstanceFromServer(ctx context.Context, qanURL *url.UR
 
 func (svc *Service) sendQANCommand(ctx context.Context, qanURL *url.URL, agentUUID string, command string, data []byte) error {
 	cmd := proto.Cmd{
-		User:      "pmm-managed",
+		User:      "ssm-managed",
 		AgentUUID: agentUUID,
 		Service:   "qan",
 		Cmd:       command,
@@ -621,7 +626,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	command := "StartTool"
 	config := map[string]interface{}{
 		"UUID":           instance.UUID,
-		"CollectFrom":    "perfschema",
+		"CollectFrom":    defaultCollectFrom,
 		"Interval":       60,
 		"ExampleQueries": true,
 	}

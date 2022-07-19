@@ -42,7 +42,7 @@ import (
 )
 
 func setup(t *testing.T) (context.Context, *Service, *sql.DB, []byte, string, *mocks.Supervisor) {
-	// We can't/shouldn't use /usr/local/percona/ (the default basedir), so use
+	// We can't/shouldn't use /opt/ss/ (the default basedir), so use
 	// a tmpdir instead with roughly the same, fake structure.
 	rootDir, err := ioutil.TempDir("/tmp", "pmm-managed-test-rootdir-")
 	assert.Nil(t, err)

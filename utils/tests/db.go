@@ -28,10 +28,10 @@ import (
 func OpenTestDB(t testing.TB) *sql.DB {
 	t.Helper()
 
-	db, err := models.OpenDB("", "pmm-managed", "pmm-managed", t.Logf)
+	db, err := models.OpenDB("", "ssm-managed", "ssm-managed", t.Logf)
 	require.NoError(t, err)
 
-	const testDatabase = "pmm-managed-dev"
+	const testDatabase = "ssm-managed-dev"
 	_, err = db.Exec("DROP DATABASE `" + testDatabase + "`")
 	require.NoError(t, err)
 	_, err = db.Exec("CREATE DATABASE `" + testDatabase + "`")
@@ -39,7 +39,7 @@ func OpenTestDB(t testing.TB) *sql.DB {
 
 	db.Close()
 
-	db, err = models.OpenDB(testDatabase, "pmm-managed", "pmm-managed", t.Logf)
+	db, err = models.OpenDB(testDatabase, "ssm-managed", "ssm-managed", t.Logf)
 	require.NoError(t, err)
 	return db
 }

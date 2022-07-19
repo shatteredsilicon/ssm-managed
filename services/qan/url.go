@@ -55,10 +55,10 @@ func getQanURL(ctx context.Context) (*url.URL, error) {
 		Host:   "127.0.0.1",
 		Path:   "/qan-api/",
 	}
-	f, err := os.Open("/srv/update/pmm-manage.yml")
+	f, err := os.Open("/srv/update/ssm-manage.yml")
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Get(ctx).WithField("component", "qan").Info("pmm-manage.yml not found, assuming default QAN API URL.")
+			logger.Get(ctx).WithField("component", "qan").Info("ssm-manage.yml not found, assuming default QAN API URL.")
 			return u, nil
 		}
 		return nil, errors.WithStack(err)

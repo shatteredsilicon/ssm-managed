@@ -126,6 +126,7 @@ type InstanceID struct {
 type Instance struct {
 	Node    models.RDSNode
 	Service models.RDSService
+	Agent   *models.Agent
 }
 
 func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.Querier) error {
@@ -385,19 +386,58 @@ func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 			services[i] = *str.(*models.RDSService)
 		}
 
+		structs, e = tx.SelectAllFrom(models.AgentServiceView, "")
+		serviceAgents := make(map[int32]int32)
+		for _, str := range structs {
+			agentService := *str.(*models.AgentService)
+			serviceAgents[agentService.ServiceID] = agentService.AgentID
+		}
+
+		structs, e = tx.SelectAllFrom(models.AgentTable, "")
+		agents := make(map[int32]models.Agent)
+		for _, str := range structs {
+			a := *str.(*models.Agent)
+			agents[a.ID] = a
+		}
+
 		for _, node := range nodes {
 			for _, service := range services {
 				if node.ID == service.NodeID {
-					res = append(res, Instance{
+					in := Instance{
 						Node:    node,
 						Service: service,
-					})
+					}
+					if sa, ok := serviceAgents[service.ID]; ok {
+						if a, ok := agents[sa]; ok {
+							in.Agent = &a
+						}
+					}
+
+					res = append(res, in)
 				}
 			}
 		}
 		return nil
 	})
 	return res, err
+}
+
+// GetDBService retrieve a rds service record with qan_db_instance_id
+func (svc *Service) GetDBService(ctx context.Context, uuid string) (*models.RDSServiceDetail, error) {
+	var s models.RDSServiceDetail
+	err := svc.DB.QueryRow(fmt.Sprintf(`
+		SELECT s.id, s.type, s.node_id, s.aws_access_key, s.aws_secret_key,
+			s.address, s.port, s.engine, s.engine_version, n.region, n.name AS instance
+		FROM %s a
+		JOIN %s ags ON a.id = ags.agent_id
+		JOIN %s s ON ags.service_id = s.id
+		JOIN %s n ON s.node_id = n.id
+		WHERE a.qan_db_instance_uuid = ?
+	`, models.AgentTable.Name(), models.AgentServiceView.Name(), models.ServiceTable.Name(), models.NodeTable.Name()), uuid).Scan(
+		&s.ID, &s.Type, &s.NodeID, &s.AWSAccessKey, &s.AWSSecretKey,
+		&s.Address, &s.Port, &s.Engine, &s.EngineVersion, &s.Region, &s.Instance,
+	)
+	return &s, err
 }
 
 func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, service *models.RDSService, username, password string) error {

@@ -53,6 +53,34 @@ func (a *Client) AddMixin5(params *AddMixin5Params) (*AddMixin5OK, error) {
 }
 
 /*
+Detail detail API
+*/
+func (a *Client) Detail(params *DetailParams) (*DetailOK, error) {
+	// TODO: Validate the params before sending
+	if params == nil {
+		params = NewDetailParams()
+	}
+
+	result, err := a.transport.Submit(&runtime.ClientOperation{
+		ID:                 "Detail",
+		Method:             "GET",
+		PathPattern:        "/v0/rds/detail",
+		ProducesMediaTypes: []string{"application/json"},
+		ConsumesMediaTypes: []string{"application/json"},
+		Schemes:            []string{"http", "https"},
+		Params:             params,
+		Reader:             &DetailReader{formats: a.formats},
+		Context:            params.Context,
+		Client:             params.HTTPClient,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(*DetailOK), nil
+
+}
+
+/*
 Discover discover API
 */
 func (a *Client) Discover(params *DiscoverParams) (*DiscoverOK, error) {

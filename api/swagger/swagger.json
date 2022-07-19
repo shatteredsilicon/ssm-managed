@@ -286,6 +286,39 @@
         }
       }
     },
+    "/v0/rds/detail": {
+      "get": {
+        "tags": [
+          "RDS"
+        ],
+        "operationId": "Detail",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "qan_db_instance_uuid",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "server_username",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "server_password",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "(empty)",
+            "schema": {
+              "$ref": "#/definitions/apiRDSDetailResponse"
+            }
+          }
+        }
+      }
+    },
     "/v0/rds/discover": {
       "post": {
         "tags": [
@@ -746,6 +779,31 @@
     "apiRDSAddResponse": {
       "type": "object"
     },
+    "apiRDSAgent": {
+      "type": "object",
+      "properties": {
+        "qan_db_instance_uuid": {
+          "type": "string"
+        }
+      }
+    },
+    "apiRDSDetailResponse": {
+      "type": "object",
+      "properties": {
+        "aws_access_key_id": {
+          "type": "string"
+        },
+        "aws_secret_access_key": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      }
+    },
     "apiRDSDiscoverRequest": {
       "type": "object",
       "properties": {
@@ -771,6 +829,9 @@
     "apiRDSInstance": {
       "type": "object",
       "properties": {
+        "agent": {
+          "$ref": "#/definitions/apiRDSAgent"
+        },
         "node": {
           "$ref": "#/definitions/apiRDSNode"
         },

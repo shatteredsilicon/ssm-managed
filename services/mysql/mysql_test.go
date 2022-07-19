@@ -104,15 +104,15 @@ func setup(t *testing.T) (context.Context, *Service, *sql.DB, []byte, string, *m
 
 	require.NoError(t, os.Setenv("PMM_QAN_API_URL", ts.URL))
 
-	// We can't/shouldn't use /usr/local/percona/ (the default basedir), so use
+	// We can't/shouldn't use /opt/ss/ (the default basedir), so use
 	// a tmpdir instead with roughly the same, fake structure.
 	rootDir, err := ioutil.TempDir("/tmp", "pmm-managed-test-rootdir-")
 	assert.Nil(t, err)
 
 	mySQLdExporterPath, err := exec.LookPath("mysqld_exporter")
 	require.NoError(t, err)
-	createFakeBin(t, filepath.Join(rootDir, "bin/percona-qan-agent"))
-	createFakeBin(t, filepath.Join(rootDir, "bin/percona-qan-agent-installer"))
+	createFakeBin(t, filepath.Join(rootDir, "bin/ssm-qan-agent"))
+	createFakeBin(t, filepath.Join(rootDir, "bin/ssm-qan-agent-installer"))
 	os.MkdirAll(filepath.Join(rootDir, "config"), 0777)
 	os.MkdirAll(filepath.Join(rootDir, "instance"), 0777)
 	err = ioutil.WriteFile(filepath.Join(rootDir, "config/agent.conf"), []byte(`{"UUID":"42","ApiHostname":"somehostname","ApiPath":"/qan-api","ServerUser":"pmm"}`), 0666)
@@ -174,10 +174,10 @@ func TestAddListRemove(t *testing.T) {
 	supervisor.On("Start", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Status", mock.Anything, mock.Anything).Return(fmt.Errorf("not running"))
 	supervisor.On("Stop", mock.Anything, mock.Anything).Return(nil)
-	id, err := svc.Add(ctx, "", "localhost", 0, "pmm-managed", "pmm-managed")
+	id, err := svc.Add(ctx, "", "localhost", 0, "ssm-managed", "ssm-managed")
 	assert.NoError(t, err)
 
-	_, err = svc.Add(ctx, "", "localhost", 3306, "pmm-managed", "pmm-managed")
+	_, err = svc.Add(ctx, "", "localhost", 3306, "ssm-managed", "ssm-managed")
 	tests.AssertGRPCError(t, status.New(codes.AlreadyExists, `MySQL instance "localhost" already exists.`), err)
 
 	actual, err = svc.List(ctx)
