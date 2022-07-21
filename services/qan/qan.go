@@ -46,7 +46,6 @@ import (
 )
 
 const (
-	managedAPIPath = "managed"
 	// RDSSlowlogCollectFrom CollectFrom of rds slow log
 	RDSSlowlogCollectFrom = "rds-slowlog"
 	// SlowlogCollectFrom CollectFrom of slow log
@@ -95,7 +94,7 @@ func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, erro
 	}
 
 	path = filepath.Join(svc.baseDir, "bin", "ssm-qan-agent-installer")
-	args := []string{"-debug", "-hostname=ssm-server", "-managed-api-path", managedAPIPath}
+	args := []string{"-debug", "-hostname=ssm-server"}
 
 	if qanURL.User != nil && qanURL.User.Username() != "" {
 		args = append(args, "-server-user="+qanURL.User.Username())
