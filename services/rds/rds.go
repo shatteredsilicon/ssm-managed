@@ -661,7 +661,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
-		if err = svc.QAN.AddMySQL(ctx, node.Name, svc.MySQLServiceFromRDSService(service), agent); err != nil {
+		if err = svc.QAN.AddMySQL(ctx, node.Name, svc.MySQLServiceFromRDSService(service), agent, qan.RDSSlowlogCollectFrom); err != nil {
 			return err
 		}
 

@@ -347,7 +347,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
-		if err = svc.QAN.AddMySQL(ctx, node.Name, service, agent); err != nil {
+		if err = svc.QAN.AddMySQL(ctx, node.Name, service, agent, qan.SlowlogCollectFrom); err != nil {
 			return err
 		}
 

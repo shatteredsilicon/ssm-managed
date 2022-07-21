@@ -46,8 +46,13 @@ import (
 )
 
 const (
-	managedAPIPath     = "managed"
-	defaultCollectFrom = "rds-slowlog"
+	managedAPIPath = "managed"
+	// RDSSlowlogCollectFrom CollectFrom of rds slow log
+	RDSSlowlogCollectFrom = "rds-slowlog"
+	// SlowlogCollectFrom CollectFrom of slow log
+	SlowlogCollectFrom = "slowlog"
+	// PerfschemaCollectFrom CollectFrom of performance schema
+	PerfschemaCollectFrom = "perfschema"
 )
 
 type Service struct {
@@ -577,7 +582,7 @@ func (svc *Service) sendQANCommand(ctx context.Context, qanURL *url.URL, agentUU
 
 // AddMySQL adds MySQL instance to QAN, configuring and enabling it.
 // It sets MySQL instance UUID to qanAgent.QANDBInstanceUUID.
-func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService *models.MySQLService, qanAgent *models.QanAgent) error {
+func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService *models.MySQLService, qanAgent *models.QanAgent, collectFrom string) error {
 	qanURL, err := svc.ensureAgentIsRegistered(ctx)
 	if err != nil {
 		return err
@@ -626,7 +631,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	command := "StartTool"
 	config := map[string]interface{}{
 		"UUID":           instance.UUID,
-		"CollectFrom":    defaultCollectFrom,
+		"CollectFrom":    collectFrom,
 		"Interval":       60,
 		"ExampleQueries": true,
 	}
