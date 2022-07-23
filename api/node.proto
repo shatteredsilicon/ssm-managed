@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package api;
+
+import "google/api/annotations.proto";
+
+message NodeRemoveRequest {
+    string name = 1;
+}
+
+message NodeRemoveResponse {
+}
+
+message NodeListRequest {
+}
+
+message NodeInstanceService {
+    uint32 id = 1;
+    string type = 2;
+    string region = 3;
+    string address = 4;
+    uint32 port = 5;
+    string engine = 6;
+    string engine_version = 7;
+}
+
+message NodeInstance {
+    string name = 1;
+    repeated NodeInstanceService services = 2;
+}
+
+message NodeListResponse {
+    repeated NodeInstance instances = 1;
+}
+
+message NodeRemoveServiceRequest {
+    uint32 id = 1;
+    string name = 2;
+    string type = 3;
+}
+
+message NodeRemoveServiceResponse {
+}
+
+service Node {
+    rpc Remove(NodeRemoveRequest) returns (NodeRemoveResponse) {
+        option (google.api.http) = {
+            delete: "/v0/nodes/{name}"
+        };
+    }
+
+    rpc List(NodeListRequest) returns (NodeListResponse) {
+        option (google.api.http) = {
+            get: "/v0/nodes"
+        };
+    }
+
+    rpc RemoveService(NodeRemoveServiceRequest) returns (NodeRemoveServiceResponse) {
+        option (google.api.http) = {
+            delete: "/v0/nodes/{name}/services"
+            body: "*"
+        };
+    }
+}

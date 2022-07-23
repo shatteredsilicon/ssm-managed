@@ -25,30 +25,30 @@ type Client struct {
 }
 
 /*
-ListMixin6 list mixin6 API
+ListMixin7 list mixin7 API
 */
-func (a *Client) ListMixin6(params *ListMixin6Params) (*ListMixin6OK, error) {
+func (a *Client) ListMixin7(params *ListMixin7Params) (*ListMixin7OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
-		params = NewListMixin6Params()
+		params = NewListMixin7Params()
 	}
 
 	result, err := a.transport.Submit(&runtime.ClientOperation{
-		ID:                 "ListMixin6",
+		ID:                 "ListMixin7",
 		Method:             "GET",
 		PathPattern:        "/v0/remote",
 		ProducesMediaTypes: []string{"application/json"},
 		ConsumesMediaTypes: []string{"application/json"},
 		Schemes:            []string{"http", "https"},
 		Params:             params,
-		Reader:             &ListMixin6Reader{formats: a.formats},
+		Reader:             &ListMixin7Reader{formats: a.formats},
 		Context:            params.Context,
 		Client:             params.HTTPClient,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*ListMixin6OK), nil
+	return result.(*ListMixin7OK), nil
 
 }
 

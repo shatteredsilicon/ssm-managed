@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/AlekSi/pointer"
+	"github.com/revel/config"
 	"github.com/shatteredsilicon/ssm/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -133,7 +134,16 @@ func setup(t *testing.T) (context.Context, *Service, *sql.DB, []byte, string, *m
 	portsRegistry := ports.NewRegistry(30000, 30999, nil)
 
 	supervisor := &mocks.Supervisor{}
-	qan, err := qan.NewService(ctx, rootDir, supervisor)
+
+	// open QAN db conn
+	qanConfig, err := config.ReadDefault("/etc/ssm-qan-api.conf")
+	require.Nil(t, err)
+	qanDSN, err := qanConfig.RawStringDefault("mysql.dsn")
+	require.Nil(t, err)
+	qanDB, err := sql.Open("mysql", qanDSN)
+	require.Nil(t, err)
+
+	qan, err := qan.NewService(ctx, rootDir, supervisor, qanDB)
 	require.NoError(t, err)
 	svc, err := NewService(&ServiceConfig{
 		MySQLdExporterPath:    mySQLdExporterPath,

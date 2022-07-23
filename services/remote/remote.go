@@ -48,6 +48,18 @@ type Instance struct {
 	Service models.RemoteService
 }
 
+// FullInstanceService contains service and agents placed on the service
+type FullInstanceService struct {
+	models.FullService
+	Agents []models.FullAgent
+}
+
+// FullInstance contains data about node, service and agent placed on the node
+type FullInstance struct {
+	Node    models.RemoteNode
+	Service FullInstanceService
+}
+
 // List returns a list of all remote nodes (including RDS nodes).
 func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 	var res []Instance
@@ -77,6 +89,81 @@ func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 						Node:    node,
 						Service: service,
 					})
+				}
+			}
+		}
+		return nil
+	})
+	return res, err
+}
+
+// ListFull returns a list of all remote nodes (including RDS nodes),
+// with all services and agents data.
+func (svc *Service) ListFull(ctx context.Context) ([]FullInstance, error) {
+	var res []FullInstance
+	err := svc.DB.InTransaction(func(tx *reform.TX) error {
+		structs, e := tx.SelectAllFrom(models.RemoteNodeTable, "WHERE type IN (?, ?) ORDER BY id", models.RDSNodeType, models.RemoteNodeType)
+		if e != nil {
+			return e
+		}
+		nodes := make([]models.RemoteNode, len(structs))
+		for i, str := range structs {
+			nodes[i] = *str.(*models.RemoteNode)
+		}
+
+		structs, e = tx.SelectAllFrom(models.FullServiceTable, "ORDER BY id")
+		if e != nil {
+			return e
+		}
+		services := make([]models.FullService, len(structs))
+		for i, str := range structs {
+			services[i] = *str.(*models.FullService)
+		}
+
+		structs, e = tx.SelectAllFrom(models.FullAgentTable, "ORDER BY id")
+		if e != nil {
+			return e
+		}
+		agents := make(map[int32]models.FullAgent, len(structs))
+		for _, str := range structs {
+			agent := *str.(*models.FullAgent)
+			agents[agent.ID] = agent
+		}
+
+		structs, e = tx.SelectAllFrom(models.AgentServiceView, "")
+		if e != nil {
+			return e
+		}
+		serviceAgents := make(map[int32][]models.FullAgent)
+		for _, str := range structs {
+			agentService := *str.(*models.AgentService)
+			agent, ok := agents[agentService.AgentID]
+			if !ok {
+				continue
+			}
+
+			if _, ok := serviceAgents[agentService.ServiceID]; ok {
+				serviceAgents[agentService.ServiceID] = append(serviceAgents[agentService.ServiceID], agent)
+			} else {
+				serviceAgents[agentService.ServiceID] = []models.FullAgent{agent}
+			}
+		}
+
+		for _, node := range nodes {
+			for _, service := range services {
+				if node.ID == service.NodeID {
+					resService := FullInstance{
+						Node: node,
+						Service: FullInstanceService{
+							FullService: service,
+						},
+					}
+
+					if agents, ok := serviceAgents[service.ID]; ok {
+						resService.Service.Agents = agents
+					}
+
+					res = append(res, resService)
 				}
 			}
 		}

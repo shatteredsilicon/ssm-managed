@@ -141,12 +141,12 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 	for _, n := range nodes {
 		node := n.(*models.RemoteNode)
 
-		mySQLServices, err := q.SelectAllFrom(models.MySQLServiceTable, "WHERE node_id = ?", node.ID)
+		mySQLServices, err := q.SelectAllFrom(models.MySQLServiceTable, "WHERE node_id = ? AND type = ?", node.ID, models.MySQLServiceType)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if len(mySQLServices) != 1 {
-			return errors.Errorf("expected to fetch 1 record, fetched %d. %v", len(mySQLServices), mySQLServices)
+		if len(mySQLServices) == 0 {
+			continue
 		}
 		service := mySQLServices[0].(*models.MySQLService)
 		if service.Type != models.MySQLServiceType {
@@ -170,6 +170,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
 						{Name: "instance", Value: node.Name},
+						{Name: "region", Value: string(models.RemoteNodeRegion)},
 					},
 				}
 				mySQLHR.StaticConfigs = append(mySQLHR.StaticConfigs, sc)
@@ -383,18 +384,21 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 		node := &models.RemoteNode{
 			Type:   models.RemoteNodeType,
 			Name:   name,
-			Region: models.RemoteNodeRegion,
+			Region: string(models.RemoteNodeRegion),
 		}
 		if err := tx.Insert(node); err != nil {
-			if err, ok := err.(*mysql.MySQLError); ok && err.Number == 0x426 {
-				return status.Errorf(codes.AlreadyExists, "MySQL instance %q already exists.",
-					node.Name)
+			if err, ok := err.(*mysql.MySQLError); !ok || err.Number != 0x426 {
+				return errors.WithStack(err)
 			}
-			return errors.WithStack(err)
+
+			err = tx.SelectOneTo(node, "WHERE type = ? AND name = ? AND region = ?", models.RemoteNodeType, name, string(models.RemoteNodeRegion))
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 		id = node.ID
 
-		engine, engineVersion, err := svc.engineAndEngineVersion(ctx, address, port, username, password)
+		engine, engineVersion, err := svc.EngineAndEngineVersion(ctx, address, port, username, password)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -535,7 +539,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 	for _, n := range nodes {
 		node := n.(*models.RemoteNode)
 
-		mySQLServices, err := tx.SelectAllFrom(models.MySQLServiceTable, "WHERE node_id = ?", node.ID)
+		mySQLServices, err := tx.SelectAllFrom(models.MySQLServiceTable, "WHERE node_id = ? AND type = ?", node.ID, models.MySQLServiceType)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -599,7 +603,8 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 	return nil
 }
 
-func (svc *Service) engineAndEngineVersion(ctx context.Context, host string, port uint32, username string, password string) (string, string, error) {
+// EngineAndEngineVersion get mysql engine version
+func (svc *Service) EngineAndEngineVersion(ctx context.Context, host string, port uint32, username string, password string) (string, string, error) {
 	var version string
 	var versionComment string
 	agent := models.MySQLdExporter{

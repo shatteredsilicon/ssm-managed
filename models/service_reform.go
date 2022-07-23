@@ -708,6 +708,139 @@ var (
 	_ fmt.Stringer  = (*RemoteService)(nil)
 )
 
+type fullServiceTableType struct {
+	s parse.StructInfo
+	z []interface{}
+}
+
+// Schema returns a schema name in SQL database ("").
+func (v *fullServiceTableType) Schema() string {
+	return v.s.SQLSchema
+}
+
+// Name returns a view or table name in SQL database ("services").
+func (v *fullServiceTableType) Name() string {
+	return v.s.SQLName
+}
+
+// Columns returns a new slice of column names for that view or table in SQL database.
+func (v *fullServiceTableType) Columns() []string {
+	return []string{"id", "type", "node_id", "aws_access_key", "aws_secret_key", "address", "port", "engine", "engine_version"}
+}
+
+// NewStruct makes a new struct for that view or table.
+func (v *fullServiceTableType) NewStruct() reform.Struct {
+	return new(FullService)
+}
+
+// NewRecord makes a new record for that table.
+func (v *fullServiceTableType) NewRecord() reform.Record {
+	return new(FullService)
+}
+
+// PKColumnIndex returns an index of primary key column for that table in SQL database.
+func (v *fullServiceTableType) PKColumnIndex() uint {
+	return uint(v.s.PKFieldIndex)
+}
+
+// FullServiceTable represents services view or table in SQL database.
+var FullServiceTable = &fullServiceTableType{
+	s: parse.StructInfo{Type: "FullService", SQLSchema: "", SQLName: "services", Fields: []parse.FieldInfo{{Name: "ID", Type: "int32", Column: "id"}, {Name: "Type", Type: "ServiceType", Column: "type"}, {Name: "NodeID", Type: "int32", Column: "node_id"}, {Name: "AWSAccessKey", Type: "*string", Column: "aws_access_key"}, {Name: "AWSSecretKey", Type: "*string", Column: "aws_secret_key"}, {Name: "Address", Type: "*string", Column: "address"}, {Name: "Port", Type: "*uint16", Column: "port"}, {Name: "Engine", Type: "*string", Column: "engine"}, {Name: "EngineVersion", Type: "*string", Column: "engine_version"}}, PKFieldIndex: 0},
+	z: new(FullService).Values(),
+}
+
+// String returns a string representation of this struct or record.
+func (s FullService) String() string {
+	res := make([]string, 9)
+	res[0] = "ID: " + reform.Inspect(s.ID, true)
+	res[1] = "Type: " + reform.Inspect(s.Type, true)
+	res[2] = "NodeID: " + reform.Inspect(s.NodeID, true)
+	res[3] = "AWSAccessKey: " + reform.Inspect(s.AWSAccessKey, true)
+	res[4] = "AWSSecretKey: " + reform.Inspect(s.AWSSecretKey, true)
+	res[5] = "Address: " + reform.Inspect(s.Address, true)
+	res[6] = "Port: " + reform.Inspect(s.Port, true)
+	res[7] = "Engine: " + reform.Inspect(s.Engine, true)
+	res[8] = "EngineVersion: " + reform.Inspect(s.EngineVersion, true)
+	return strings.Join(res, ", ")
+}
+
+// Values returns a slice of struct or record field values.
+// Returned interface{} values are never untyped nils.
+func (s *FullService) Values() []interface{} {
+	return []interface{}{
+		s.ID,
+		s.Type,
+		s.NodeID,
+		s.AWSAccessKey,
+		s.AWSSecretKey,
+		s.Address,
+		s.Port,
+		s.Engine,
+		s.EngineVersion,
+	}
+}
+
+// Pointers returns a slice of pointers to struct or record fields.
+// Returned interface{} values are never untyped nils.
+func (s *FullService) Pointers() []interface{} {
+	return []interface{}{
+		&s.ID,
+		&s.Type,
+		&s.NodeID,
+		&s.AWSAccessKey,
+		&s.AWSSecretKey,
+		&s.Address,
+		&s.Port,
+		&s.Engine,
+		&s.EngineVersion,
+	}
+}
+
+// View returns View object for that struct.
+func (s *FullService) View() reform.View {
+	return FullServiceTable
+}
+
+// Table returns Table object for that record.
+func (s *FullService) Table() reform.Table {
+	return FullServiceTable
+}
+
+// PKValue returns a value of primary key for that record.
+// Returned interface{} value is never untyped nil.
+func (s *FullService) PKValue() interface{} {
+	return s.ID
+}
+
+// PKPointer returns a pointer to primary key field for that record.
+// Returned interface{} value is never untyped nil.
+func (s *FullService) PKPointer() interface{} {
+	return &s.ID
+}
+
+// HasPK returns true if record has non-zero primary key set, false otherwise.
+func (s *FullService) HasPK() bool {
+	return s.ID != FullServiceTable.z[FullServiceTable.s.PKFieldIndex]
+}
+
+// SetPK sets record primary key.
+func (s *FullService) SetPK(pk interface{}) {
+	if i64, ok := pk.(int64); ok {
+		s.ID = int32(i64)
+	} else {
+		s.ID = pk.(int32)
+	}
+}
+
+// check interfaces
+var (
+	_ reform.View   = FullServiceTable
+	_ reform.Struct = (*FullService)(nil)
+	_ reform.Table  = FullServiceTable
+	_ reform.Record = (*FullService)(nil)
+	_ fmt.Stringer  = (*FullService)(nil)
+)
+
 func init() {
 	parse.AssertUpToDate(&ServiceTable.s, new(Service))
 	parse.AssertUpToDate(&RDSServiceTable.s, new(RDSService))
@@ -715,4 +848,5 @@ func init() {
 	parse.AssertUpToDate(&PostgreSQLServiceTable.s, new(PostgreSQLService))
 	parse.AssertUpToDate(&MySQLServiceTable.s, new(MySQLService))
 	parse.AssertUpToDate(&RemoteServiceTable.s, new(RemoteService))
+	parse.AssertUpToDate(&FullServiceTable.s, new(FullService))
 }

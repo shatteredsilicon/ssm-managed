@@ -59,6 +59,28 @@ func (c *Client) GetNodes() ([]*Node, error) {
 	return nodes, nil
 }
 
+// GetNode returns a node
+func (c *Client) GetNode(nodeID string) (*api.CatalogNode, error) {
+	node, _, err := c.c.Catalog().Node(nodeID, nil)
+
+	return node, err
+}
+
+// DeregisterNode deregisters consul catalog node
+func (c *Client) DeregisterNode(nodeID string) (*api.WriteMeta, error) {
+	return c.c.Catalog().Deregister(&api.CatalogDeregistration{
+		Node: nodeID,
+	}, nil)
+}
+
+// DeregisterService deregisters consul catalog service
+func (c *Client) DeregisterService(nodeID, serviceID string) (*api.WriteMeta, error) {
+	return c.c.Catalog().Deregister(&api.CatalogDeregistration{
+		Node:      nodeID,
+		ServiceID: serviceID,
+	}, nil)
+}
+
 // GetKV returns value for a given key from Consul, or nil, if key does not exist.
 func (c *Client) GetKV(key string) ([]byte, error) {
 	key = path.Join(prefix, key)
@@ -85,4 +107,16 @@ func (c *Client) DeleteKV(key string) error {
 	key = path.Join(prefix, key)
 	_, err := c.c.KV().Delete(key, nil)
 	return errors.Wrapf(err, "cannot delete key %q", key)
+}
+
+// GetNoPrefixKV returns value for a given key from Consul, or nil, if key does not exist.
+func (c *Client) GetNoPrefixKV(key string) ([]byte, error) {
+	pair, _, err := c.c.KV().Get(key, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot get key %q", key)
+	}
+	if pair == nil {
+		return nil, nil
+	}
+	return pair.Value, nil
 }

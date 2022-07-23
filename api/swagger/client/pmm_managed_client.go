@@ -16,6 +16,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/demo"
 	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/logs"
 	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/my_sql"
+	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/node"
 	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/postgre_sql"
 	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/r_d_s"
 	"github.com/shatteredsilicon/ssm-managed/api/swagger/client/remote"
@@ -74,6 +75,8 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *PmmManaged
 	cli.Logs = logs.New(transport, formats)
 
 	cli.MySQL = my_sql.New(transport, formats)
+
+	cli.Node = node.New(transport, formats)
 
 	cli.PostgreSQL = postgre_sql.New(transport, formats)
 
@@ -137,6 +140,8 @@ type PmmManaged struct {
 
 	MySQL *my_sql.Client
 
+	Node *node.Client
+
 	PostgreSQL *postgre_sql.Client
 
 	RDS *r_d_s.Client
@@ -161,6 +166,8 @@ func (c *PmmManaged) SetTransport(transport runtime.ClientTransport) {
 	c.Logs.SetTransport(transport)
 
 	c.MySQL.SetTransport(transport)
+
+	c.Node.SetTransport(transport)
 
 	c.PostgreSQL.SetTransport(transport)
 

@@ -54,6 +54,7 @@ func (s *RemoteServer) List(ctx context.Context, req *api.RemoteListRequest) (*a
 			},
 		})
 	}
+
 	return &resp, nil
 }
 

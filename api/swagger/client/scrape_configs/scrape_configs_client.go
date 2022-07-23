@@ -25,30 +25,30 @@ type Client struct {
 }
 
 /*
-CreateMixin7 creates creates a new scrape config errors invalid argument 3 if some argument is not valid already exists 6 if scrape config with that job name is already present failed precondition 9 if reachability check was requested and some scrape target can t be reached
+CreateMixin8 creates creates a new scrape config errors invalid argument 3 if some argument is not valid already exists 6 if scrape config with that job name is already present failed precondition 9 if reachability check was requested and some scrape target can t be reached
 */
-func (a *Client) CreateMixin7(params *CreateMixin7Params) (*CreateMixin7OK, error) {
+func (a *Client) CreateMixin8(params *CreateMixin8Params) (*CreateMixin8OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
-		params = NewCreateMixin7Params()
+		params = NewCreateMixin8Params()
 	}
 
 	result, err := a.transport.Submit(&runtime.ClientOperation{
-		ID:                 "CreateMixin7",
+		ID:                 "CreateMixin8",
 		Method:             "POST",
 		PathPattern:        "/v0/scrape-configs",
 		ProducesMediaTypes: []string{"application/json"},
 		ConsumesMediaTypes: []string{"application/json"},
 		Schemes:            []string{"http", "https"},
 		Params:             params,
-		Reader:             &CreateMixin7Reader{formats: a.formats},
+		Reader:             &CreateMixin8Reader{formats: a.formats},
 		Context:            params.Context,
 		Client:             params.HTTPClient,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*CreateMixin7OK), nil
+	return result.(*CreateMixin8OK), nil
 
 }
 
@@ -109,30 +109,30 @@ func (a *Client) Get(params *GetParams) (*GetOK, error) {
 }
 
 /*
-ListMixin7 lists returns all scrape configs
+ListMixin8 lists returns all scrape configs
 */
-func (a *Client) ListMixin7(params *ListMixin7Params) (*ListMixin7OK, error) {
+func (a *Client) ListMixin8(params *ListMixin8Params) (*ListMixin8OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
-		params = NewListMixin7Params()
+		params = NewListMixin8Params()
 	}
 
 	result, err := a.transport.Submit(&runtime.ClientOperation{
-		ID:                 "ListMixin7",
+		ID:                 "ListMixin8",
 		Method:             "GET",
 		PathPattern:        "/v0/scrape-configs",
 		ProducesMediaTypes: []string{"application/json"},
 		ConsumesMediaTypes: []string{"application/json"},
 		Schemes:            []string{"http", "https"},
 		Params:             params,
-		Reader:             &ListMixin7Reader{formats: a.formats},
+		Reader:             &ListMixin8Reader{formats: a.formats},
 		Context:            params.Context,
 		Client:             params.HTTPClient,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*ListMixin7OK), nil
+	return result.(*ListMixin8OK), nil
 
 }
 

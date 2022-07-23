@@ -25,30 +25,30 @@ type Client struct {
 }
 
 /*
-AddMixin5 add mixin5 API
+AddMixin6 add mixin6 API
 */
-func (a *Client) AddMixin5(params *AddMixin5Params) (*AddMixin5OK, error) {
+func (a *Client) AddMixin6(params *AddMixin6Params) (*AddMixin6OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
-		params = NewAddMixin5Params()
+		params = NewAddMixin6Params()
 	}
 
 	result, err := a.transport.Submit(&runtime.ClientOperation{
-		ID:                 "AddMixin5",
+		ID:                 "AddMixin6",
 		Method:             "POST",
 		PathPattern:        "/v0/rds",
 		ProducesMediaTypes: []string{"application/json"},
 		ConsumesMediaTypes: []string{"application/json"},
 		Schemes:            []string{"http", "https"},
 		Params:             params,
-		Reader:             &AddMixin5Reader{formats: a.formats},
+		Reader:             &AddMixin6Reader{formats: a.formats},
 		Context:            params.Context,
 		Client:             params.HTTPClient,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*AddMixin5OK), nil
+	return result.(*AddMixin6OK), nil
 
 }
 
@@ -109,58 +109,58 @@ func (a *Client) Discover(params *DiscoverParams) (*DiscoverOK, error) {
 }
 
 /*
-ListMixin5 list mixin5 API
+ListMixin6 list mixin6 API
 */
-func (a *Client) ListMixin5(params *ListMixin5Params) (*ListMixin5OK, error) {
+func (a *Client) ListMixin6(params *ListMixin6Params) (*ListMixin6OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
-		params = NewListMixin5Params()
+		params = NewListMixin6Params()
 	}
 
 	result, err := a.transport.Submit(&runtime.ClientOperation{
-		ID:                 "ListMixin5",
+		ID:                 "ListMixin6",
 		Method:             "GET",
 		PathPattern:        "/v0/rds",
 		ProducesMediaTypes: []string{"application/json"},
 		ConsumesMediaTypes: []string{"application/json"},
 		Schemes:            []string{"http", "https"},
 		Params:             params,
-		Reader:             &ListMixin5Reader{formats: a.formats},
+		Reader:             &ListMixin6Reader{formats: a.formats},
 		Context:            params.Context,
 		Client:             params.HTTPClient,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*ListMixin5OK), nil
+	return result.(*ListMixin6OK), nil
 
 }
 
 /*
-RemoveMixin5 remove mixin5 API
+RemoveMixin6 remove mixin6 API
 */
-func (a *Client) RemoveMixin5(params *RemoveMixin5Params) (*RemoveMixin5OK, error) {
+func (a *Client) RemoveMixin6(params *RemoveMixin6Params) (*RemoveMixin6OK, error) {
 	// TODO: Validate the params before sending
 	if params == nil {
-		params = NewRemoveMixin5Params()
+		params = NewRemoveMixin6Params()
 	}
 
 	result, err := a.transport.Submit(&runtime.ClientOperation{
-		ID:                 "RemoveMixin5",
+		ID:                 "RemoveMixin6",
 		Method:             "DELETE",
 		PathPattern:        "/v0/rds",
 		ProducesMediaTypes: []string{"application/json"},
 		ConsumesMediaTypes: []string{"application/json"},
 		Schemes:            []string{"http", "https"},
 		Params:             params,
-		Reader:             &RemoveMixin5Reader{formats: a.formats},
+		Reader:             &RemoveMixin6Reader{formats: a.formats},
 		Context:            params.Context,
 		Client:             params.HTTPClient,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*RemoveMixin5OK), nil
+	return result.(*RemoveMixin6OK), nil
 
 }
 

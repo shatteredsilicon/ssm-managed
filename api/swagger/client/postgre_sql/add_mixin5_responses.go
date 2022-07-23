@@ -16,17 +16,17 @@ import (
 	models "github.com/shatteredsilicon/ssm-managed/api/swagger/models"
 )
 
-// ListMixin4Reader is a Reader for the ListMixin4 structure.
-type ListMixin4Reader struct {
+// AddMixin5Reader is a Reader for the AddMixin5 structure.
+type AddMixin5Reader struct {
 	formats strfmt.Registry
 }
 
 // ReadResponse reads a server response into the received o.
-func (o *ListMixin4Reader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
+func (o *AddMixin5Reader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
 
 	case 200:
-		result := NewListMixin4OK()
+		result := NewAddMixin5OK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
@@ -37,26 +37,26 @@ func (o *ListMixin4Reader) ReadResponse(response runtime.ClientResponse, consume
 	}
 }
 
-// NewListMixin4OK creates a ListMixin4OK with default headers values
-func NewListMixin4OK() *ListMixin4OK {
-	return &ListMixin4OK{}
+// NewAddMixin5OK creates a AddMixin5OK with default headers values
+func NewAddMixin5OK() *AddMixin5OK {
+	return &AddMixin5OK{}
 }
 
-/*ListMixin4OK handles this case with default header values.
+/*AddMixin5OK handles this case with default header values.
 
 (empty)
 */
-type ListMixin4OK struct {
-	Payload *models.APIPostgreSQLListResponse
+type AddMixin5OK struct {
+	Payload *models.APIPostgreSQLAddResponse
 }
 
-func (o *ListMixin4OK) Error() string {
-	return fmt.Sprintf("[GET /v0/postgresql][%d] listMixin4OK  %+v", 200, o.Payload)
+func (o *AddMixin5OK) Error() string {
+	return fmt.Sprintf("[POST /v0/postgresql][%d] addMixin5OK  %+v", 200, o.Payload)
 }
 
-func (o *ListMixin4OK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
+func (o *AddMixin5OK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
-	o.Payload = new(models.APIPostgreSQLListResponse)
+	o.Payload = new(models.APIPostgreSQLAddResponse)
 
 	// response payload
 	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {

@@ -17,6 +17,8 @@
 package models
 
 import (
+	"database/sql"
+
 	"github.com/pkg/errors"
 	"gopkg.in/reform.v1"
 )
@@ -30,8 +32,8 @@ type AgentNode struct {
 }
 
 // AgentsForNodeID returns agents providing insights for a given node.
-func AgentsForNodeID(q *reform.Querier, nodeID int32) ([]Agent, error) {
-	agentNodes, err := q.SelectAllFrom(AgentNodeView, "WHERE node_id = ?", nodeID)
+func AgentsForNodeID(q *reform.Querier, nodeIDs ...interface{}) ([]Agent, error) {
+	agentNodes, err := q.FindAllFrom(AgentNodeView, "node_id", nodeIDs...)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -53,4 +55,27 @@ func AgentsForNodeID(q *reform.Querier, nodeID int32) ([]Agent, error) {
 		agents[i] = *str.(*Agent)
 	}
 	return agents, nil
+}
+
+// AgentNodeByName returns agent_nodes
+func AgentNodeByName(q *reform.Querier, nodeName, agentType string) (*AgentNode, error) {
+	var agentID, nodeID int32
+	err := q.QueryRow(`
+SELECT agn.agent_id, agn.node_id
+FROM agent_nodes agn
+JOIN nodes ON agn.node_id = nodes.id
+JOIN agents ON agn.agent_id = agents.id
+WHERE nodes.name = ? and agents.type = ?
+`, nodeName, agentType).Scan(&agentID, &nodeID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &AgentNode{
+		AgentID: agentID,
+		NodeID:  nodeID,
+	}, nil
 }

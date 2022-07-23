@@ -119,12 +119,12 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 	for _, n := range nodes {
 		node := n.(*models.RemoteNode)
 
-		postgreSQLServices, e := q.SelectAllFrom(models.PostgreSQLServiceTable, "WHERE node_id = ?", node.ID)
+		postgreSQLServices, e := q.SelectAllFrom(models.PostgreSQLServiceTable, "WHERE node_id = ? AND type = ?", node.ID, models.PostgreSQLServiceType)
 		if e != nil {
 			return errors.WithStack(e)
 		}
-		if len(postgreSQLServices) != 1 {
-			return errors.Errorf("expected to fetch 1 record, fetched %d. %v", len(postgreSQLServices), postgreSQLServices)
+		if len(postgreSQLServices) == 0 {
+			continue
 		}
 		service := postgreSQLServices[0].(*models.PostgreSQLService)
 		if service.Type != models.PostgreSQLServiceType {
@@ -148,6 +148,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
 						{Name: "instance", Value: node.Name},
+						{Name: "region", Value: string(models.RemoteNodeRegion)},
 					},
 				}
 				postgreSQLConfig.StaticConfigs = append(postgreSQLConfig.StaticConfigs, sc)
@@ -231,14 +232,17 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 		node := &models.RemoteNode{
 			Type:   models.RemoteNodeType,
 			Name:   name,
-			Region: models.RemoteNodeRegion,
+			Region: string(models.RemoteNodeRegion),
 		}
 		if err := tx.Insert(node); err != nil {
-			if err, ok := err.(*mysql.MySQLError); ok && err.Number == 0x426 {
-				return status.Errorf(codes.AlreadyExists, "PostgreSQL instance %q already exists.",
-					node.Name)
+			if err, ok := err.(*mysql.MySQLError); !ok || err.Number != 0x426 {
+				return errors.WithStack(err)
 			}
-			return errors.WithStack(err)
+
+			err = tx.SelectOneTo(node, "WHERE type = ? AND name = ? AND region = ?", models.RemoteNodeType, name, string(models.RemoteNodeRegion))
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 		id = node.ID
 
@@ -465,7 +469,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 	for _, n := range nodes {
 		node := n.(*models.RemoteNode)
 
-		postgreSQLServices, e := tx.SelectAllFrom(models.PostgreSQLServiceTable, "WHERE node_id = ?", node.ID)
+		postgreSQLServices, e := tx.SelectAllFrom(models.PostgreSQLServiceTable, "WHERE node_id = ? AND type = ?", node.ID, models.PostgreSQLServiceType)
 		if e != nil {
 			return errors.WithStack(e)
 		}

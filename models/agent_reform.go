@@ -627,10 +627,260 @@ var (
 	_ fmt.Stringer  = (*QanAgent)(nil)
 )
 
+type nodeExporterTableType struct {
+	s parse.StructInfo
+	z []interface{}
+}
+
+// Schema returns a schema name in SQL database ("").
+func (v *nodeExporterTableType) Schema() string {
+	return v.s.SQLSchema
+}
+
+// Name returns a view or table name in SQL database ("agents").
+func (v *nodeExporterTableType) Name() string {
+	return v.s.SQLName
+}
+
+// Columns returns a new slice of column names for that view or table in SQL database.
+func (v *nodeExporterTableType) Columns() []string {
+	return []string{"id", "type", "runs_on_node_id", "listen_port"}
+}
+
+// NewStruct makes a new struct for that view or table.
+func (v *nodeExporterTableType) NewStruct() reform.Struct {
+	return new(NodeExporter)
+}
+
+// NewRecord makes a new record for that table.
+func (v *nodeExporterTableType) NewRecord() reform.Record {
+	return new(NodeExporter)
+}
+
+// PKColumnIndex returns an index of primary key column for that table in SQL database.
+func (v *nodeExporterTableType) PKColumnIndex() uint {
+	return uint(v.s.PKFieldIndex)
+}
+
+// NodeExporterTable represents agents view or table in SQL database.
+var NodeExporterTable = &nodeExporterTableType{
+	s: parse.StructInfo{Type: "NodeExporter", SQLSchema: "", SQLName: "agents", Fields: []parse.FieldInfo{{Name: "ID", Type: "int32", Column: "id"}, {Name: "Type", Type: "AgentType", Column: "type"}, {Name: "RunsOnNodeID", Type: "int32", Column: "runs_on_node_id"}, {Name: "ListenPort", Type: "*uint16", Column: "listen_port"}}, PKFieldIndex: 0},
+	z: new(NodeExporter).Values(),
+}
+
+// String returns a string representation of this struct or record.
+func (s NodeExporter) String() string {
+	res := make([]string, 4)
+	res[0] = "ID: " + reform.Inspect(s.ID, true)
+	res[1] = "Type: " + reform.Inspect(s.Type, true)
+	res[2] = "RunsOnNodeID: " + reform.Inspect(s.RunsOnNodeID, true)
+	res[3] = "ListenPort: " + reform.Inspect(s.ListenPort, true)
+	return strings.Join(res, ", ")
+}
+
+// Values returns a slice of struct or record field values.
+// Returned interface{} values are never untyped nils.
+func (s *NodeExporter) Values() []interface{} {
+	return []interface{}{
+		s.ID,
+		s.Type,
+		s.RunsOnNodeID,
+		s.ListenPort,
+	}
+}
+
+// Pointers returns a slice of pointers to struct or record fields.
+// Returned interface{} values are never untyped nils.
+func (s *NodeExporter) Pointers() []interface{} {
+	return []interface{}{
+		&s.ID,
+		&s.Type,
+		&s.RunsOnNodeID,
+		&s.ListenPort,
+	}
+}
+
+// View returns View object for that struct.
+func (s *NodeExporter) View() reform.View {
+	return NodeExporterTable
+}
+
+// Table returns Table object for that record.
+func (s *NodeExporter) Table() reform.Table {
+	return NodeExporterTable
+}
+
+// PKValue returns a value of primary key for that record.
+// Returned interface{} value is never untyped nil.
+func (s *NodeExporter) PKValue() interface{} {
+	return s.ID
+}
+
+// PKPointer returns a pointer to primary key field for that record.
+// Returned interface{} value is never untyped nil.
+func (s *NodeExporter) PKPointer() interface{} {
+	return &s.ID
+}
+
+// HasPK returns true if record has non-zero primary key set, false otherwise.
+func (s *NodeExporter) HasPK() bool {
+	return s.ID != NodeExporterTable.z[NodeExporterTable.s.PKFieldIndex]
+}
+
+// SetPK sets record primary key.
+func (s *NodeExporter) SetPK(pk interface{}) {
+	if i64, ok := pk.(int64); ok {
+		s.ID = int32(i64)
+	} else {
+		s.ID = pk.(int32)
+	}
+}
+
+// check interfaces
+var (
+	_ reform.View   = NodeExporterTable
+	_ reform.Struct = (*NodeExporter)(nil)
+	_ reform.Table  = NodeExporterTable
+	_ reform.Record = (*NodeExporter)(nil)
+	_ fmt.Stringer  = (*NodeExporter)(nil)
+)
+
+type fullAgentTableType struct {
+	s parse.StructInfo
+	z []interface{}
+}
+
+// Schema returns a schema name in SQL database ("").
+func (v *fullAgentTableType) Schema() string {
+	return v.s.SQLSchema
+}
+
+// Name returns a view or table name in SQL database ("agents").
+func (v *fullAgentTableType) Name() string {
+	return v.s.SQLName
+}
+
+// Columns returns a new slice of column names for that view or table in SQL database.
+func (v *fullAgentTableType) Columns() []string {
+	return []string{"id", "type", "runs_on_node_id", "qan_db_instance_uuid", "service_username", "service_password", "listen_port", "mysql_disable_tablestats"}
+}
+
+// NewStruct makes a new struct for that view or table.
+func (v *fullAgentTableType) NewStruct() reform.Struct {
+	return new(FullAgent)
+}
+
+// NewRecord makes a new record for that table.
+func (v *fullAgentTableType) NewRecord() reform.Record {
+	return new(FullAgent)
+}
+
+// PKColumnIndex returns an index of primary key column for that table in SQL database.
+func (v *fullAgentTableType) PKColumnIndex() uint {
+	return uint(v.s.PKFieldIndex)
+}
+
+// FullAgentTable represents agents view or table in SQL database.
+var FullAgentTable = &fullAgentTableType{
+	s: parse.StructInfo{Type: "FullAgent", SQLSchema: "", SQLName: "agents", Fields: []parse.FieldInfo{{Name: "ID", Type: "int32", Column: "id"}, {Name: "Type", Type: "AgentType", Column: "type"}, {Name: "RunsOnNodeID", Type: "int32", Column: "runs_on_node_id"}, {Name: "QanDBInstanceUUID", Type: "*string", Column: "qan_db_instance_uuid"}, {Name: "ServiceUsername", Type: "*string", Column: "service_username"}, {Name: "ServicePassword", Type: "*string", Column: "service_password"}, {Name: "ListenPort", Type: "*uint16", Column: "listen_port"}, {Name: "MySQLDisableTablestats", Type: "*bool", Column: "mysql_disable_tablestats"}}, PKFieldIndex: 0},
+	z: new(FullAgent).Values(),
+}
+
+// String returns a string representation of this struct or record.
+func (s FullAgent) String() string {
+	res := make([]string, 8)
+	res[0] = "ID: " + reform.Inspect(s.ID, true)
+	res[1] = "Type: " + reform.Inspect(s.Type, true)
+	res[2] = "RunsOnNodeID: " + reform.Inspect(s.RunsOnNodeID, true)
+	res[3] = "QanDBInstanceUUID: " + reform.Inspect(s.QanDBInstanceUUID, true)
+	res[4] = "ServiceUsername: " + reform.Inspect(s.ServiceUsername, true)
+	res[5] = "ServicePassword: " + reform.Inspect(s.ServicePassword, true)
+	res[6] = "ListenPort: " + reform.Inspect(s.ListenPort, true)
+	res[7] = "MySQLDisableTablestats: " + reform.Inspect(s.MySQLDisableTablestats, true)
+	return strings.Join(res, ", ")
+}
+
+// Values returns a slice of struct or record field values.
+// Returned interface{} values are never untyped nils.
+func (s *FullAgent) Values() []interface{} {
+	return []interface{}{
+		s.ID,
+		s.Type,
+		s.RunsOnNodeID,
+		s.QanDBInstanceUUID,
+		s.ServiceUsername,
+		s.ServicePassword,
+		s.ListenPort,
+		s.MySQLDisableTablestats,
+	}
+}
+
+// Pointers returns a slice of pointers to struct or record fields.
+// Returned interface{} values are never untyped nils.
+func (s *FullAgent) Pointers() []interface{} {
+	return []interface{}{
+		&s.ID,
+		&s.Type,
+		&s.RunsOnNodeID,
+		&s.QanDBInstanceUUID,
+		&s.ServiceUsername,
+		&s.ServicePassword,
+		&s.ListenPort,
+		&s.MySQLDisableTablestats,
+	}
+}
+
+// View returns View object for that struct.
+func (s *FullAgent) View() reform.View {
+	return FullAgentTable
+}
+
+// Table returns Table object for that record.
+func (s *FullAgent) Table() reform.Table {
+	return FullAgentTable
+}
+
+// PKValue returns a value of primary key for that record.
+// Returned interface{} value is never untyped nil.
+func (s *FullAgent) PKValue() interface{} {
+	return s.ID
+}
+
+// PKPointer returns a pointer to primary key field for that record.
+// Returned interface{} value is never untyped nil.
+func (s *FullAgent) PKPointer() interface{} {
+	return &s.ID
+}
+
+// HasPK returns true if record has non-zero primary key set, false otherwise.
+func (s *FullAgent) HasPK() bool {
+	return s.ID != FullAgentTable.z[FullAgentTable.s.PKFieldIndex]
+}
+
+// SetPK sets record primary key.
+func (s *FullAgent) SetPK(pk interface{}) {
+	if i64, ok := pk.(int64); ok {
+		s.ID = int32(i64)
+	} else {
+		s.ID = pk.(int32)
+	}
+}
+
+// check interfaces
+var (
+	_ reform.View   = FullAgentTable
+	_ reform.Struct = (*FullAgent)(nil)
+	_ reform.Table  = FullAgentTable
+	_ reform.Record = (*FullAgent)(nil)
+	_ fmt.Stringer  = (*FullAgent)(nil)
+)
+
 func init() {
 	parse.AssertUpToDate(&AgentTable.s, new(Agent))
 	parse.AssertUpToDate(&MySQLdExporterTable.s, new(MySQLdExporter))
 	parse.AssertUpToDate(&PostgresExporterTable.s, new(PostgresExporter))
 	parse.AssertUpToDate(&RDSExporterTable.s, new(RDSExporter))
 	parse.AssertUpToDate(&QanAgentTable.s, new(QanAgent))
+	parse.AssertUpToDate(&NodeExporterTable.s, new(NodeExporter))
+	parse.AssertUpToDate(&FullAgentTable.s, new(FullAgent))
 }

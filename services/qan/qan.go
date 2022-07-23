@@ -20,6 +20,7 @@ package qan
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -54,17 +55,30 @@ const (
 	PerfschemaCollectFrom = "perfschema"
 )
 
+// QAN subsystem types
+const (
+	SubsystemOS = iota + 1
+	SubsystemAgent
+	SubsystemMySQL
+	SubsystemMongo
+)
+
+// zero time of QAN database
+var qanDeletedTimeZero = time.Unix(1, 0)
+
 type Service struct {
 	baseDir    string
 	supervisor services.Supervisor
 	qanAPI     *http.Client
+	db         *sql.DB
 }
 
-func NewService(ctx context.Context, baseDir string, supervisor services.Supervisor) (*Service, error) {
+func NewService(ctx context.Context, baseDir string, supervisor services.Supervisor, db *sql.DB) (*Service, error) {
 	svc := &Service{
 		baseDir:    baseDir,
 		supervisor: supervisor,
 		qanAPI:     new(http.Client),
+		db:         db,
 	}
 
 	return svc, nil
@@ -388,7 +402,7 @@ func (svc *Service) getInstances(ctx context.Context, qanURL *url.URL) ([]proto.
 }
 
 // getAgentUUID returns agent UUID from the qan-agent configuration file.
-func (svc *Service) getAgentUUID() (string, error) {
+func (svc *Service) GetAgentUUID() (string, error) {
 	path := svc.qanAgentConfigPath()
 	f, err := os.Open(path)
 
@@ -489,9 +503,10 @@ func (svc *Service) addInstanceToServer(ctx context.Context, qanURL *url.URL, in
 }
 
 // removeInstanceFromServer removes instance from QAN API.
-func (svc *Service) removeInstanceFromServer(ctx context.Context, qanURL *url.URL, uuid string) error {
+func (svc *Service) removeInstanceFromServer(ctx context.Context, qanURL *url.URL, uuid string, tail ...string) error {
 	url := *qanURL
-	url.Path = path.Join(url.Path, "instances", uuid)
+	url.Path = path.Join(append([]string{url.Path, "instances", uuid}, tail...)...)
+
 	req, err := http.NewRequest("DELETE", url.String(), nil)
 
 	if err != nil {
@@ -587,7 +602,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 		return err
 	}
 
-	agentUUID, err := svc.getAgentUUID()
+	agentUUID, err := svc.GetAgentUUID()
 	if err != nil {
 		return err
 	}
@@ -656,7 +671,7 @@ func (svc *Service) RemoveMySQL(ctx context.Context, qanAgent *models.QanAgent) 
 		return err
 	}
 
-	agentUUID, err := svc.getAgentUUID()
+	agentUUID, err := svc.GetAgentUUID()
 	if err != nil {
 		return err
 	}
@@ -671,4 +686,120 @@ func (svc *Service) RemoveMySQL(ctx context.Context, qanAgent *models.QanAgent) 
 
 	// we do not stop qan-agent even if it has zero MySQL instances now - to be safe
 	return svc.removeInstanceFromServer(ctx, qanURL, *qanAgent.QANDBInstanceUUID)
+}
+
+// RemoveClientQAN remove client-added qan
+func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID string) error {
+	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	if err != nil {
+		return err
+	}
+
+	command := "StopTool"
+	b := []byte(instanceID)
+
+	if err = svc.sendQANCommand(ctx, qanURL, agentID, command, b); err != nil {
+		logger.Get(ctx).WithField("component", "qan").Errorf("sendQANCommand %s %s %s %s", agentID, instanceID, command, b)
+	}
+
+	return svc.removeInstanceFromServer(ctx, qanURL, instanceID)
+}
+
+// RemoveQANData remove qan data
+func (svc *Service) RemoveQANData(ctx context.Context, agentID, instanceID string) error {
+	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	if err != nil {
+		return err
+	}
+
+	return svc.removeInstanceFromServer(ctx, qanURL, instanceID, "data")
+}
+
+// GetAgentUUIDFromDB get unremoved agent uuid from QAN database
+func (svc *Service) GetAgentUUIDFromDB(ctx context.Context, clientName string, subsystem int) (uuid string, err error) {
+	err = svc.db.QueryRow(`
+SELECT ins1.uuid
+FROM instances ins1
+JOIN instances ins2 ON ins1.parent_uuid = ins2.parent_uuid
+WHERE ins1.subsystem_id = ? AND ins2.name = ? AND ins2.subsystem_id = ?
+`, SubsystemAgent, clientName, subsystem).Scan(&uuid)
+
+	return
+}
+
+// UnremovedNode unremoved node structure
+type UnremovedNode struct {
+	Name         string
+	InstanceUUID string
+	SubsystemID  int
+	OSName       string
+}
+
+// GetUnremovedNodes returns unremoved nodes,
+// returns nil error if they don't exist
+func (svc *Service) GetUnremovedNodes(ctx context.Context, instanceName string, checkData bool) ([]UnremovedNode, error) {
+	var nodes []UnremovedNode
+
+	q1 := `
+SELECT inst.name, inst.uuid, inst.subsystem_id, inst.parent_uuid
+FROM (
+	SELECT DISTINCT instance_id
+	FROM query_global_metrics
+) qgm
+JOIN instances inst ON qgm.instance_id = inst.instance_id
+WHERE (inst.subsystem_id = ? OR inst.subsystem_id = ?)
+`
+	q2 := `
+SELECT name, uuid, subsystem_id, parent_uuid
+FROM instances
+WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instances.subsystem_id = ?)
+`
+
+	q1Args := []interface{}{SubsystemMySQL, SubsystemMongo}
+	q2Args := []interface{}{qanDeletedTimeZero, SubsystemMySQL, SubsystemMongo}
+	if instanceName != "" {
+		q1 += " AND inst.name = ?"
+		q2 += " AND name = ?"
+		q1Args = append(q1Args, instanceName)
+		q2Args = append(q2Args, instanceName)
+	}
+
+	if checkData {
+		q2Args = append(q1Args, q2Args...)
+		q2 = fmt.Sprintf(" %s UNION DISTINCT %s", q1, q2)
+	}
+
+	q := fmt.Sprintf(`
+SELECT inst2.name, inst2.uuid, inst2.subsystem_id, inst1.name AS os_name
+FROM instances inst1
+JOIN (
+	%s
+) inst2 ON inst1.uuid = inst2.parent_uuid
+`, q2)
+
+	rows, err := svc.db.Query(q, q2Args...)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var name, instanceUUID, osName string
+	var subsystemID int
+	for rows.Next() {
+		err = rows.Scan(&name, &instanceUUID, &subsystemID, &osName)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, UnremovedNode{
+			Name:         name,
+			InstanceUUID: instanceUUID,
+			SubsystemID:  subsystemID,
+			OSName:       osName,
+		})
+	}
+
+	return nodes, nil
 }

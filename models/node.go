@@ -27,7 +27,14 @@ const (
 	RemoteNodeType    NodeType = "remote"
 )
 
-const RemoteNodeRegion string = "remote"
+// RegionType Type of region
+type RegionType string
+
+// Region types
+const (
+	RemoteNodeRegion RegionType = "remote"
+	ClientNodeRegion RegionType = "client"
+)
 
 //reform:nodes
 type Node struct {
