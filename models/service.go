@@ -89,3 +89,17 @@ type RemoteService struct {
 	Engine        *string `reform:"engine"`
 	EngineVersion *string `reform:"engine_version"`
 }
+
+//reform:services
+type FullService struct {
+	ID     int32       `reform:"id,pk"`
+	Type   ServiceType `reform:"type"`
+	NodeID int32       `reform:"node_id"`
+
+	AWSAccessKey  *string `reform:"aws_access_key"` // may be nil
+	AWSSecretKey  *string `reform:"aws_secret_key"` // may be nil
+	Address       *string `reform:"address"`
+	Port          *uint16 `reform:"port"`
+	Engine        *string `reform:"engine"`
+	EngineVersion *string `reform:"engine_version"`
+}

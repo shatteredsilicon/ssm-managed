@@ -37,10 +37,20 @@ type AgentType string
 
 // AgentType agent types for exporters and agents
 const (
-	MySQLdExporterAgentType   AgentType = "mysqld_exporter"
-	PostgresExporterAgentType AgentType = "postgres_exporter"
-	RDSExporterAgentType      AgentType = "rds_exporter"
-	QanAgentAgentType         AgentType = "qan-agent"
+	MySQLdExporterAgentType         AgentType = "mysqld_exporter"
+	PostgresExporterAgentType       AgentType = "postgres_exporter"
+	RDSExporterAgentType            AgentType = "rds_exporter"
+	QanAgentAgentType               AgentType = "qan-agent"
+	NodeExporterAgentType           AgentType = "node_exporter"
+	ProxySQLExporterAgentType       AgentType = "proxysql_exporter"
+	MongoDBExporterAgentType        AgentType = "mongodb_exporter"
+	ClientNodeExporterAgentType     AgentType = "linux:metrics"
+	ClientMySQLdExporterAgentType   AgentType = "mysql:metrics"
+	ClientMySQLQanAgentAgentType    AgentType = "mysql:queries"
+	ClientMongoDBExporterAgentType  AgentType = "mongodb:metrics"
+	ClientMongoDBQanAgentAgentType  AgentType = "mongodb:queries"
+	ClientPostgresExporterAgentType AgentType = "postgresql:metrics"
+	ClientProxySQLExporterAgentType AgentType = "proxysql:metrics"
 )
 
 // NameForSupervisor returns a name of agent for supervisor.
@@ -136,6 +146,28 @@ type QanAgent struct {
 	ServicePassword   *string `reform:"service_password"`
 	ListenPort        *uint16 `reform:"listen_port"`
 	QANDBInstanceUUID *string `reform:"qan_db_instance_uuid"` // MySQL instance UUID in QAN
+}
+
+//reform:agents
+type NodeExporter struct {
+	ID           int32     `reform:"id,pk"`
+	Type         AgentType `reform:"type"`
+	RunsOnNodeID int32     `reform:"runs_on_node_id"`
+
+	ListenPort *uint16 `reform:"listen_port"`
+}
+
+// reform:agents
+type FullAgent struct {
+	ID                int32     `reform:"id,pk"`
+	Type              AgentType `reform:"type"`
+	RunsOnNodeID      int32     `reform:"runs_on_node_id"`
+	QanDBInstanceUUID *string   `reform:"qan_db_instance_uuid"`
+
+	ServiceUsername        *string `reform:"service_username"`
+	ServicePassword        *string `reform:"service_password"`
+	ListenPort             *uint16 `reform:"listen_port"`
+	MySQLDisableTablestats *bool   `reform:"mysql_disable_tablestats"`
 }
 
 func (q *QanAgent) DSN(service *MySQLService) string {

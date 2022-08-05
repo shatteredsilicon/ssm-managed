@@ -19,6 +19,7 @@ package prometheus
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -26,6 +27,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -37,6 +39,11 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
+
+// deleteSeriesURI api to delete prometheus series data
+const deleteSeriesURI = "api/v1/admin/tsdb/delete_series"
+const cleanTombstonesURI = "api/v1/admin/tsdb/clean_tombstones"
+const instanceLabelsURI = "api/v1/label/instance/values"
 
 var checkFailedRE = regexp.MustCompile(`FAILED: parsing YAML file \S+: (.+)\n`)
 
@@ -233,5 +240,60 @@ func (svc *Service) Check(ctx context.Context) error {
 		return svc.saveConfigAndReload(ctx, config)
 	}
 	l.Info("Prometheus configuration not changed.")
+	return nil
+}
+
+// DeleteSeries calls delete_series api
+func (svc *Service) DeleteSeries(queries map[string]string) error {
+	if len(queries) == 0 {
+		return fmt.Errorf("removing all metrics data is not allowed")
+	}
+
+	u := *svc.baseURL
+	u.Path = path.Join(u.Path, deleteSeriesURI)
+	q := u.Query()
+
+	queryStrs, i := make([]string, len(queries)), 0
+	for k, v := range queries {
+		queryStrs[i] = fmt.Sprintf("%s=\"%s\"", k, v)
+		i++
+	}
+	q.Set("match[]", fmt.Sprintf("{%s}", strings.Join(queryStrs, ",")))
+	u.RawQuery = q.Encode()
+	resp, err := svc.client.Post(u.String(), "application/json", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return errors.Errorf("unexpected api %s returns: code: %d, data: %s", u.String(), resp.StatusCode, string(b))
+	}
+
+	return nil
+}
+
+// CleanTombstones calls clean_tombstones api
+func (svc *Service) CleanTombstones(ctx context.Context) error {
+	u := *svc.baseURL
+	u.Path = path.Join(u.Path, cleanTombstonesURI)
+	resp, err := svc.client.Post(u.String(), "application/json", nil)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return errors.Errorf("unexpected api %s returns: code: %d, data: %s", u.String(), resp.StatusCode, string(b))
+	}
+
 	return nil
 }

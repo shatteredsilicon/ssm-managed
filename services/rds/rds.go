@@ -169,6 +169,10 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		ScrapeTimeout:  "55s",
 		MetricsPath:    "/basic",
 		HonorLabels:    true,
+		RelabelConfigs: []prometheus.RelabelConfig{{
+			TargetLabel: "job",
+			Replacement: "rds",
+		}},
 	}
 	rdsEnhanced := &prometheus.ScrapeConfig{
 		JobName:        "rds-enhanced",
@@ -176,6 +180,10 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		ScrapeTimeout:  "9s",
 		MetricsPath:    "/enhanced",
 		HonorLabels:    true,
+		RelabelConfigs: []prometheus.RelabelConfig{{
+			TargetLabel: "job",
+			Replacement: "rds",
+		}},
 	}
 
 	nodes, err := q.FindAllFrom(models.RDSNodeTable, "type", models.RDSNodeType)
@@ -186,7 +194,9 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		node := n.(*models.RDSNode)
 
 		var service models.RDSService
-		if e := q.SelectOneTo(&service, "WHERE node_id = ?", node.ID); e != nil {
+		if e := q.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", node.ID, models.RDSServiceType); e == sql.ErrNoRows {
+			continue
+		} else if e != nil {
 			return errors.WithStack(e)
 		}
 
@@ -210,6 +220,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
 						{Name: "aws_region", Value: node.Region},
+						{Name: "region", Value: string(models.RemoteNodeRegion)},
 						{Name: "instance", Value: node.Name},
 					},
 				}
@@ -228,6 +239,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
 						{Name: "aws_region", Value: node.Region},
+						{Name: "region", Value: string(models.RemoteNodeRegion)},
 						{Name: "instance", Value: node.Name},
 					},
 				}
@@ -533,7 +545,7 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 	}
 }
 
-func (svc *Service) updateRDSExporterConfig(tx *reform.TX) (*rdsExporterConfig, error) {
+func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX) (*rdsExporterConfig, error) {
 	// collect all RDS nodes
 	var config rdsExporterConfig
 	nodes, err := tx.FindAllFrom(models.RDSNodeTable, "type", models.RDSNodeType)
@@ -582,7 +594,7 @@ func (svc *Service) updateRDSExporterConfig(tx *reform.TX) (*rdsExporterConfig, 
 	return &config, nil
 }
 
-func (svc *Service) rdsExporterServiceConfig(agent *models.RDSExporter) *servicelib.Config {
+func (svc *Service) RDSExporterServiceConfig(agent *models.RDSExporter) *servicelib.Config {
 	name := models.NameForSupervisor(agent.Type, *agent.ListenPort)
 
 	return &servicelib.Config{
@@ -618,7 +630,7 @@ func (svc *Service) addRDSExporter(ctx context.Context, tx *reform.TX, service *
 
 	if svc.RDSExporterPath != "" {
 		// update rds_exporter configuration
-		if _, err = svc.updateRDSExporterConfig(tx); err != nil {
+		if _, err = svc.UpdateRDSExporterConfig(tx); err != nil {
 			return err
 		}
 
@@ -627,7 +639,7 @@ func (svc *Service) addRDSExporter(ctx context.Context, tx *reform.TX, service *
 		if err = svc.Supervisor.Stop(ctx, name); err != nil {
 			logger.Get(ctx).WithField("component", "rds").Warn(err)
 		}
-		if err = svc.Supervisor.Start(ctx, svc.rdsExporterServiceConfig(agent)); err != nil {
+		if err = svc.Supervisor.Start(ctx, svc.RDSExporterServiceConfig(agent)); err != nil {
 			return err
 		}
 	}
@@ -661,7 +673,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
-		if err = svc.QAN.AddMySQL(ctx, node.Name, svc.MySQLServiceFromRDSService(service), agent); err != nil {
+		if err = svc.QAN.AddMySQL(ctx, node.Name, svc.MySQLServiceFromRDSService(service), agent, qan.RDSSlowlogCollectFrom); err != nil {
 			return err
 		}
 
@@ -781,7 +793,7 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 		}
 
 		var service models.RDSService
-		if err = tx.SelectOneTo(&service, "WHERE node_id = ?", node.ID); err != nil {
+		if err = tx.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", node.ID, models.RDSServiceType); err != nil {
 			return errors.WithStack(err)
 		}
 
@@ -845,7 +857,7 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 				}
 				if svc.RDSExporterPath != "" {
 					// update rds_exporter configuration
-					config, err := svc.updateRDSExporterConfig(tx)
+					config, err := svc.UpdateRDSExporterConfig(tx)
 					if err != nil {
 						return err
 					}
@@ -856,7 +868,7 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 						return err
 					}
 					if len(config.Instances) > 0 {
-						if err = svc.Supervisor.Start(ctx, svc.rdsExporterServiceConfig(&a)); err != nil {
+						if err = svc.Supervisor.Start(ctx, svc.RDSExporterServiceConfig(&a)); err != nil {
 							return err
 						}
 					}
@@ -903,7 +915,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 		node := n.(*models.RDSNode)
 
 		service := &models.RDSService{}
-		if e := tx.SelectOneTo(service, "WHERE node_id = ?", node.ID); e != nil {
+		if e := tx.SelectOneTo(service, "WHERE node_id = ? AND type = ?", node.ID, models.RDSServiceType); e != nil {
 			return errors.WithStack(e)
 		}
 
@@ -941,7 +953,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					return errors.WithStack(err)
 				}
 				if svc.RDSExporterPath != "" {
-					config, err := svc.updateRDSExporterConfig(tx)
+					config, err := svc.UpdateRDSExporterConfig(tx)
 					if err != nil {
 						return err
 					}
@@ -956,7 +968,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 							}
 						}
 
-						if err = svc.Supervisor.Start(ctx, svc.rdsExporterServiceConfig(&a)); err != nil {
+						if err = svc.Supervisor.Start(ctx, svc.RDSExporterServiceConfig(&a)); err != nil {
 							return err
 						}
 					}

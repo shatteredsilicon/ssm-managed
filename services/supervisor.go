@@ -18,8 +18,14 @@ package services
 
 import (
 	"context"
+	"errors"
 
 	servicelib "github.com/percona/kardianos-service"
+)
+
+var (
+	// ErrNoSuchFileOrDir no such file or directory error
+	ErrNoSuchFileOrDir = errors.New("no such file or directory")
 )
 
 //go:generate mockery -name=Supervisor -case=snake

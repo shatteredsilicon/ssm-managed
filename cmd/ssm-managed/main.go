@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	_ "expvar"
 	"flag"
 	"fmt"
@@ -37,6 +38,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/revel/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -51,6 +53,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 	"github.com/shatteredsilicon/ssm-managed/services/logs"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
+	"github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
@@ -87,9 +90,10 @@ var (
 	consulAddrF  = flag.String("consul-addr", "127.0.0.1:8500", "Consul HTTP API address")
 	grafanaAddrF = flag.String("grafana-addr", "127.0.0.1:3000", "Grafana HTTP API address")
 
-	dbNameF     = flag.String("db-name", "", "Database name")
-	dbUsernameF = flag.String("db-username", "ssm-managed", "Database username")
-	dbPasswordF = flag.String("db-password", "ssm-managed", "Database password")
+	dbNameF       = flag.String("db-name", "", "Database name")
+	dbUsernameF   = flag.String("db-username", "ssm-managed", "Database username")
+	dbPasswordF   = flag.String("db-password", "ssm-managed", "Database password")
+	qanAPIConfigF = flag.String("qan-api-config", "/etc/ssm-qan-api.conf", "QAN configuration file path")
 
 	agentMySQLdExporterF    = flag.String("agent-mysqld-exporter", "/opt/ss/ssm-client/mysqld_exporter", "mysqld_exporter path")
 	agentPostgresExporterF  = flag.String("agent-postgres-exporter", "/opt/ss/ssm-client/postgres_exporter", "postgres_exporter path")
@@ -270,6 +274,7 @@ type grpcServerDependencies struct {
 	postgres     *postgresql.Service
 	remote       *remote.Service
 	logs         *logs.Logs
+	node         *node.Service
 }
 
 // runGRPCServer runs gRPC server until context is canceled, then gracefully stops it.
@@ -305,6 +310,10 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 	})
 	api.RegisterAnnotationsServer(gRPCServer, &handlers.AnnotationsServer{
 		Grafana: grafana,
+	})
+	api.RegisterNodeServer(gRPCServer, &handlers.NodeServer{
+		Node:   deps.node,
+		Remote: deps.remote,
 	})
 
 	grpc_prometheus.Register(gRPCServer)
@@ -354,6 +363,7 @@ func runRESTServer(ctx context.Context, logs *logs.Logs) {
 		api.RegisterRemoteHandlerFromEndpoint,
 		api.RegisterLogsHandlerFromEndpoint,
 		api.RegisterAnnotationsHandlerFromEndpoint,
+		api.RegisterNodeHandlerFromEndpoint,
 	} {
 		if err := r(ctx, proxyMux, *gRPCAddrF, opts); err != nil {
 			l.Panic(err)
@@ -530,7 +540,21 @@ func main() {
 
 	supervisor := supervisor.New(l)
 
-	qan, err := qan.NewService(ctx, *agentQANBaseF, supervisor)
+	// open QAN db conn
+	qanConfig, err := config.ReadDefault(*qanAPIConfigF)
+	if err != nil {
+		l.Panic(err)
+	}
+	qanDSN, err := qanConfig.RawStringDefault("mysql.dsn")
+	if err != nil {
+		l.Panic(err)
+	}
+	qanDB, err := sql.Open("mysql", qanDSN)
+	if err != nil {
+		l.Panic(err)
+	}
+
+	qan, err := qan.NewService(ctx, *agentQANBaseF, supervisor, qanDB)
 	if err != nil {
 		l.Panicf("QAN service problem: %+v", err)
 	}
@@ -578,6 +602,8 @@ func main() {
 
 	logs := logs.New(Version, consulClient, db, rds, nil)
 
+	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, deps.db, mysqlService, postgres, rds)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -591,6 +617,7 @@ func main() {
 			remote:              remoteService,
 			consulClient:        consulClient,
 			logs:                logs,
+			node:                nodeService,
 		})
 	}()
 
