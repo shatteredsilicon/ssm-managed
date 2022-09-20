@@ -61,6 +61,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/services/supervisor"
 	"github.com/shatteredsilicon/ssm-managed/services/telemetry"
+	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/interceptors"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
@@ -68,9 +69,6 @@ import (
 
 const (
 	shutdownTimeout = 3 * time.Second
-
-	// TODO set during build
-	Version = "v8.6.1.17.5.1"
 )
 
 var (
@@ -288,7 +286,7 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 		grpc.UnaryInterceptor(interceptors.Unary),
 		grpc.StreamInterceptor(interceptors.Stream),
 	)
-	api.RegisterBaseServer(gRPCServer, &handlers.BaseServer{PMMVersion: Version})
+	api.RegisterBaseServer(gRPCServer, &handlers.BaseServer{PMMVersion: utils.Version})
 	api.RegisterDemoServer(gRPCServer, &handlers.DemoServer{})
 	api.RegisterScrapeConfigsServer(gRPCServer, &handlers.ScrapeConfigsServer{
 		Prometheus: deps.prometheus,
@@ -467,7 +465,7 @@ func runTelemetryService(ctx context.Context, consulClient *consul.Client) {
 		l.Panicf("cannot get/set telemetry UUID in Consul: %s", err)
 	}
 
-	svc := telemetry.NewService(uuid, Version)
+	svc := telemetry.NewService(uuid, utils.Version)
 	svc.Run(ctx)
 }
 
@@ -492,7 +490,7 @@ func getTelemetryUUID(consulClient *consul.Client) (string, error) {
 
 func main() {
 	log.SetFlags(0)
-	log.Printf("ssm-managed %s", Version)
+	log.Printf("ssm-managed %s", utils.Version)
 	log.SetPrefix("stdlog: ")
 	flag.Parse()
 
@@ -600,7 +598,7 @@ func main() {
 		l.Panicf("Remote service problem: %+v", err)
 	}
 
-	logs := logs.New(Version, consulClient, db, rds, nil)
+	logs := logs.New(utils.Version, consulClient, db, rds, nil)
 
 	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, deps.db, mysqlService, postgres, rds)
 
