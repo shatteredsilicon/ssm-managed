@@ -504,7 +504,7 @@ func (svc *Service) removeNodeFromPrometheus(ctx context.Context, nodeID string)
 		}
 
 		err = svc.prometheus.DeleteSeries(map[string]string{
-			"instance": nodeName,
+			"instance=": nodeName,
 		})
 		if err != nil {
 			return fmt.Errorf("delete metrics data for %s failed: %s", nodeName, err.Error())
@@ -853,7 +853,7 @@ func (svc *Service) GetRegionFromAgentType(agentType models.AgentType) string {
 
 func (svc *Service) genPromtheusQueries(nodeName string, service string) map[string]string {
 	queries := map[string]string{
-		"instance": nodeName,
+		"instance=": nodeName,
 	}
 
 	agentType := models.AgentType(service)
@@ -861,11 +861,11 @@ func (svc *Service) genPromtheusQueries(nodeName string, service string) map[str
 	case models.MySQLdExporterAgentType, models.PostgresExporterAgentType,
 		models.NodeExporterAgentType, models.ProxySQLExporterAgentType,
 		models.MongoDBExporterAgentType:
-		queries["region"] = string(models.RemoteNodeRegion)
+		queries["region="] = string(models.RemoteNodeRegion)
 	case models.ClientNodeExporterAgentType, models.ClientMySQLdExporterAgentType,
 		models.ClientMongoDBExporterAgentType, models.ClientPostgresExporterAgentType,
 		models.ClientProxySQLExporterAgentType:
-		queries["region"] = string(models.ClientNodeRegion)
+		queries["region="] = string(models.ClientNodeRegion)
 	case models.RDSExporterAgentType:
 		break
 	default:
@@ -874,17 +874,17 @@ func (svc *Service) genPromtheusQueries(nodeName string, service string) map[str
 
 	switch agentType {
 	case models.MySQLdExporterAgentType, models.ClientMySQLdExporterAgentType:
-		queries["job"] = "mysql"
+		queries["job="] = "mysql"
 	case models.PostgresExporterAgentType, models.ClientPostgresExporterAgentType:
-		queries["job"] = "postgresql"
+		queries["job="] = "postgresql"
 	case models.MongoDBExporterAgentType, models.ClientMongoDBExporterAgentType:
-		queries["job"] = "mongodb"
+		queries["job="] = "mongodb"
 	case models.NodeExporterAgentType, models.ClientNodeExporterAgentType:
-		queries["job"] = "linux"
+		queries["job="] = "linux"
 	case models.ProxySQLExporterAgentType, models.ClientProxySQLExporterAgentType:
-		queries["job"] = "proxysql"
+		queries["job="] = "proxysql"
 	case models.RDSExporterAgentType:
-		queries["job"] = "rds"
+		queries["job=~"] = "rds-*"
 	default:
 		return nil
 	}

@@ -169,10 +169,6 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		ScrapeTimeout:  "55s",
 		MetricsPath:    "/basic",
 		HonorLabels:    true,
-		RelabelConfigs: []prometheus.RelabelConfig{{
-			TargetLabel: "job",
-			Replacement: "rds",
-		}},
 	}
 	rdsEnhanced := &prometheus.ScrapeConfig{
 		JobName:        "rds-enhanced",
@@ -180,10 +176,6 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		ScrapeTimeout:  "9s",
 		MetricsPath:    "/enhanced",
 		HonorLabels:    true,
-		RelabelConfigs: []prometheus.RelabelConfig{{
-			TargetLabel: "job",
-			Replacement: "rds",
-		}},
 	}
 
 	nodes, err := q.FindAllFrom(models.RDSNodeTable, "type", models.RDSNodeType)
