@@ -14,7 +14,7 @@ const (
 	targetsURI = "api/v1/targets"
 )
 
-var jobServiceMap = map[string]models.AgentType{
+var scrapePoolServiceMap = map[string]models.AgentType{
 	"linux":             models.ClientNodeExporterAgentType,
 	"mongodb":           models.ClientMongoDBExporterAgentType,
 	"proxysql":          models.ClientProxySQLExporterAgentType,
@@ -27,9 +27,11 @@ var jobServiceMap = map[string]models.AgentType{
 	"remote-mysql-hr":   models.MySQLdExporterAgentType,
 	"remote-mysql-mr":   models.MySQLdExporterAgentType,
 	"remote-mysql-lr":   models.MySQLdExporterAgentType,
-	"rds-mysql-hr":      models.RDSExporterAgentType,
-	"rds-mysql-mr":      models.RDSExporterAgentType,
-	"rds-mysql-lr":      models.RDSExporterAgentType,
+	"rds-mysql-hr":      models.MySQLdExporterAgentType,
+	"rds-mysql-mr":      models.MySQLdExporterAgentType,
+	"rds-mysql-lr":      models.MySQLdExporterAgentType,
+	"rds-basic":         models.RDSExporterAgentType,
+	"rds-enhanced":      models.RDSExporterAgentType,
 }
 
 // TargetActiveTarget active target structure of prometheus GET targets api
@@ -95,14 +97,14 @@ func (svc *Service) GetNodeServices(ctx context.Context) ([]NodeService, error) 
 			continue
 		}
 
-		agentType, ok := jobServiceMap[target.ScrapePool]
+		agentType, ok := scrapePoolServiceMap[target.ScrapePool]
 		if !ok {
 			continue
 		}
 
 		exists := false
 		for _, service := range services {
-			if service.Type == agentType {
+			if service.Name == target.Labels.Instance && service.Type == agentType {
 				exists = true
 				break
 			}

@@ -305,51 +305,37 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 }
 
 func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, service string) error {
-	removeNodeAndService := func(tx *reform.TX, agentNode *models.AgentNode, agentService *models.AgentService) error {
-		if agentService == nil && agentNode == nil {
-			return nil
-		}
-		var nodeID int32
-
-		if agentNode != nil {
-			nodeID = agentNode.NodeID
-		}
-
-		if agentService != nil {
-			count, err := tx.Count(models.AgentServiceView, "WHERE service_id = ?", agentService.ServiceID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			if count > 0 {
-				return nil
-			}
-
-			if nodeID == 0 {
-				var service models.Service
-				err = tx.SelectOneTo(&service, "WHERE id = ?", agentService.ServiceID)
-				if err != nil && err != sql.ErrNoRows {
-					return errors.WithStack(err)
-				}
-				nodeID = service.NodeID
-			}
-
-			_, err = tx.DeleteFrom(models.ServiceTable, "WHERE id = ?", agentService.ServiceID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-		}
-
-		if nodeID == 0 {
+	removeNodeAndService := func(tx *reform.TX, agentService *models.AgentService) error {
+		if agentService == nil {
 			return nil
 		}
 
-		countAgent, err := tx.Count(models.AgentNodeView, "WHERE node_id = ?", nodeID)
+		count, err := tx.Count(models.AgentServiceView, "WHERE service_id = ?", agentService.ServiceID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		countService, err := tx.Count(models.ServiceTable, "WHERE node_id = ?", nodeID)
+		if count > 0 {
+			return nil
+		}
+
+		var service models.Service
+		err = tx.SelectOneTo(&service, "WHERE id = ?", agentService.ServiceID)
+		if err != nil && err != sql.ErrNoRows {
+			return errors.WithStack(err)
+		}
+
+		_, err = tx.DeleteFrom(models.ServiceTable, "WHERE id = ?", agentService.ServiceID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		countAgent, err := tx.Count(models.AgentTable, "WHERE runs_on_node_id = ?", service.NodeID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		countService, err := tx.Count(models.ServiceTable, "WHERE node_id = ?", service.NodeID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -358,7 +344,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			return nil
 		}
 
-		_, err = tx.DeleteFrom(models.NodeTable, "WHERE id = ?", nodeID)
+		_, err = tx.DeleteFrom(models.NodeTable, "WHERE id = ?", service.NodeID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -367,39 +353,27 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 	}
 
 	return svc.db.InTransaction(func(tx *reform.TX) error {
-		agentNode, err := models.AgentNodeByName(tx.Querier, nodeName, service)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		if agentNode != nil {
-			_, err = tx.DeleteFrom(models.AgentNodeView, "WHERE node_id = ? AND agent_id = ?", agentNode.NodeID, agentNode.AgentID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-		}
-
 		agentService, err := models.AgentServiceByName(tx.Querier, nodeName, service)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if agentService != nil {
-			_, err = tx.DeleteFrom(models.AgentServiceView, "WHERE service_id = ? AND agent_id = ?", agentService.ServiceID, agentService.AgentID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
+		if agentService == nil {
+			return nil
 		}
 
-		if agentService == nil && agentNode == nil {
-			return nil
+		_, err = tx.DeleteFrom(models.AgentNodeView, "WHERE agent_id = ?", agentService.AgentID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		_, err = tx.DeleteFrom(models.AgentServiceView, "WHERE service_id = ? AND agent_id = ?", agentService.ServiceID, agentService.AgentID)
+		if err != nil {
+			return errors.WithStack(err)
 		}
 
 		// stop agents
 		var agent models.Agent
-		if agentNode != nil {
-			err = tx.SelectOneTo(&agent, "WHERE id = ?", agentNode.AgentID)
-		} else {
-			err = tx.SelectOneTo(&agent, "WHERE id = ?", agentService.AgentID)
-		}
+		err = tx.SelectOneTo(&agent, "WHERE id = ?", agentService.AgentID)
 		if err == sql.ErrNoRows {
 			return nil
 		}
@@ -435,9 +409,16 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			if err = tx.Reload(&a); err != nil {
 				return errors.WithStack(err)
 			}
+
+			// remove agent
+			err = tx.Delete(&agent)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
 			if svc.rds.RDSExporterPath != "" {
 				// update rds_exporter configuration
-				config, err := svc.rds.UpdateRDSExporterConfig(tx)
+				config, err := svc.rds.UpdateRDSExporterConfig(tx, true)
 				if err != nil {
 					return err
 				}
@@ -475,12 +456,14 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 		}
 
 		// remove agent
-		err = tx.Delete(&agent)
-		if err != nil {
-			return errors.WithStack(err)
+		if agent.Type != models.RDSExporterAgentType {
+			err = tx.Delete(&agent)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 
-		err = removeNodeAndService(tx, agentNode, agentService)
+		err = removeNodeAndService(tx, &agentService.AgentService)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -489,6 +472,9 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 		case models.RDSExporterAgentType:
 			return svc.rds.ApplyPrometheusConfiguration(ctx, tx.Querier)
 		case models.MySQLdExporterAgentType:
+			if agentService.NodeType == string(models.RDSNodeType) {
+				return svc.rds.ApplyPrometheusConfiguration(ctx, tx.Querier)
+			}
 			return svc.mysql.ApplyPrometheusConfiguration(ctx, tx.Querier)
 		case models.PostgresExporterAgentType:
 			return svc.postgresql.ApplyPrometheusConfiguration(ctx, tx.Querier)
@@ -688,7 +674,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 				}
 				if svc.rds.RDSExporterPath != "" {
 					// update rds_exporter configuration
-					config, err := svc.rds.UpdateRDSExporterConfig(tx)
+					config, err := svc.rds.UpdateRDSExporterConfig(tx, false)
 					if err != nil {
 						return err
 					}

@@ -31,6 +31,12 @@ type AgentService struct {
 	ServiceID int32 `reform:"service_id"`
 }
 
+// AgentServiceDetail AgentService with detail
+type AgentServiceDetail struct {
+	AgentService
+	NodeType string `reform:"node_type"`
+}
+
 // AgentsForServiceID returns agents providing insights for given services.
 func AgentsForServiceID(q *reform.Querier, serviceIDs ...interface{}) ([]Agent, error) {
 	agentServices, err := q.FindAllFrom(AgentServiceView, "service_id", serviceIDs...)
@@ -58,16 +64,17 @@ func AgentsForServiceID(q *reform.Querier, serviceIDs ...interface{}) ([]Agent, 
 }
 
 // AgentServiceByName returns agent_service
-func AgentServiceByName(q *reform.Querier, nodeName, agentType string) (*AgentService, error) {
+func AgentServiceByName(q *reform.Querier, nodeName, agentType string) (*AgentServiceDetail, error) {
 	var agentID, serviceID int32
+	var nodeType string
 	err := q.QueryRow(`
-SELECT agsv.agent_id, agsv.service_id
+SELECT agsv.agent_id, agsv.service_id, nodes.type
 FROM agent_services agsv
 JOIN services ON agsv.service_id = services.id
 JOIN nodes ON services.node_id = nodes.id
 JOIN agents ON agsv.agent_id = agents.id
 WHERE nodes.name = ? and agents.type = ?
-`, nodeName, agentType).Scan(&agentID, &serviceID)
+`, nodeName, agentType).Scan(&agentID, &serviceID, &nodeType)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -75,8 +82,11 @@ WHERE nodes.name = ? and agents.type = ?
 		return nil, err
 	}
 
-	return &AgentService{
-		AgentID:   agentID,
-		ServiceID: serviceID,
+	return &AgentServiceDetail{
+		AgentService: AgentService{
+			AgentID:   agentID,
+			ServiceID: serviceID,
+		},
+		NodeType: nodeType,
 	}, nil
 }
