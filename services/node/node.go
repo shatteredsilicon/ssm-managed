@@ -460,9 +460,17 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.qan != nil {
+				agentUUID, err := svc.qan.GetAgentUUID()
+				if err != nil {
+					return err
+				}
+
+				<-time.Tick(1 * time.Second) // delay a little bit to avoid duplicate record in qan database
 				if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 					return err
 				}
+
+				go svc.removeQANData(ctx, nodeName, agentUUID, *a.QANDBInstanceUUID)
 			}
 		}
 
