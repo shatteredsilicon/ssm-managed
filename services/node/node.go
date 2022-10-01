@@ -174,13 +174,29 @@ func (svc *Service) removeServiceFromPrometheus(ctx context.Context, nodeName, s
 			return fmt.Errorf("get active targets from prometheus for %s-%s failed: %s", nodeName, service, err.Error())
 		}
 
+		reAdded, nodeTargets := false, 0
 		for _, target := range activeTargets {
+			if target.Name == nodeName {
+				nodeTargets++
+			}
 			if target.Name == nodeName && string(target.Type) == service { // service has been re-added
-				return nil
+				reAdded = true
 			}
 		}
+		if reAdded {
+			return nil
+		}
 
-		queries := svc.genPromtheusQueries(nodeName, service)
+		var queries map[string]string
+		if nodeTargets == 0 {
+			// no prometheus service under this node
+			// remove all historical data
+			queries = map[string]string{
+				"instance=": nodeName,
+			}
+		} else {
+			queries = svc.genPromtheusQueries(nodeName, service)
+		}
 		if queries != nil {
 			err := svc.prometheus.DeleteSeries(queries)
 			if err != nil {
