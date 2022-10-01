@@ -255,7 +255,7 @@ func (svc *Service) DeleteSeries(queries map[string]string) error {
 
 	queryStrs, i := make([]string, len(queries)), 0
 	for k, v := range queries {
-		queryStrs[i] = fmt.Sprintf("%s=\"%s\"", k, v)
+		queryStrs[i] = fmt.Sprintf("%s\"%s\"", k, v)
 		i++
 	}
 	q.Set("match[]", fmt.Sprintf("{%s}", strings.Join(queryStrs, ",")))

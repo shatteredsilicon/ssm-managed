@@ -174,13 +174,29 @@ func (svc *Service) removeServiceFromPrometheus(ctx context.Context, nodeName, s
 			return fmt.Errorf("get active targets from prometheus for %s-%s failed: %s", nodeName, service, err.Error())
 		}
 
+		reAdded, nodeTargets := false, 0
 		for _, target := range activeTargets {
+			if target.Name == nodeName {
+				nodeTargets++
+			}
 			if target.Name == nodeName && string(target.Type) == service { // service has been re-added
-				return nil
+				reAdded = true
 			}
 		}
+		if reAdded {
+			return nil
+		}
 
-		queries := svc.genPromtheusQueries(nodeName, service)
+		var queries map[string]string
+		if nodeTargets == 0 {
+			// no prometheus service under this node
+			// remove all historical data
+			queries = map[string]string{
+				"instance=": nodeName,
+			}
+		} else {
+			queries = svc.genPromtheusQueries(nodeName, service)
+		}
 		if queries != nil {
 			err := svc.prometheus.DeleteSeries(queries)
 			if err != nil {
@@ -305,51 +321,37 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 }
 
 func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, service string) error {
-	removeNodeAndService := func(tx *reform.TX, agentNode *models.AgentNode, agentService *models.AgentService) error {
-		if agentService == nil && agentNode == nil {
-			return nil
-		}
-		var nodeID int32
-
-		if agentNode != nil {
-			nodeID = agentNode.NodeID
-		}
-
-		if agentService != nil {
-			count, err := tx.Count(models.AgentServiceView, "WHERE service_id = ?", agentService.ServiceID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			if count > 0 {
-				return nil
-			}
-
-			if nodeID == 0 {
-				var service models.Service
-				err = tx.SelectOneTo(&service, "WHERE id = ?", agentService.ServiceID)
-				if err != nil && err != sql.ErrNoRows {
-					return errors.WithStack(err)
-				}
-				nodeID = service.NodeID
-			}
-
-			_, err = tx.DeleteFrom(models.ServiceTable, "WHERE id = ?", agentService.ServiceID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-		}
-
-		if nodeID == 0 {
+	removeNodeAndService := func(tx *reform.TX, agentService *models.AgentService) error {
+		if agentService == nil {
 			return nil
 		}
 
-		countAgent, err := tx.Count(models.AgentNodeView, "WHERE node_id = ?", nodeID)
+		count, err := tx.Count(models.AgentServiceView, "WHERE service_id = ?", agentService.ServiceID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		countService, err := tx.Count(models.ServiceTable, "WHERE node_id = ?", nodeID)
+		if count > 0 {
+			return nil
+		}
+
+		var service models.Service
+		err = tx.SelectOneTo(&service, "WHERE id = ?", agentService.ServiceID)
+		if err != nil && err != sql.ErrNoRows {
+			return errors.WithStack(err)
+		}
+
+		_, err = tx.DeleteFrom(models.ServiceTable, "WHERE id = ?", agentService.ServiceID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		countAgent, err := tx.Count(models.AgentTable, "WHERE runs_on_node_id = ?", service.NodeID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		countService, err := tx.Count(models.ServiceTable, "WHERE node_id = ?", service.NodeID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -358,7 +360,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			return nil
 		}
 
-		_, err = tx.DeleteFrom(models.NodeTable, "WHERE id = ?", nodeID)
+		_, err = tx.DeleteFrom(models.NodeTable, "WHERE id = ?", service.NodeID)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -367,39 +369,27 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 	}
 
 	return svc.db.InTransaction(func(tx *reform.TX) error {
-		agentNode, err := models.AgentNodeByName(tx.Querier, nodeName, service)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		if agentNode != nil {
-			_, err = tx.DeleteFrom(models.AgentNodeView, "WHERE node_id = ? AND agent_id = ?", agentNode.NodeID, agentNode.AgentID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-		}
-
 		agentService, err := models.AgentServiceByName(tx.Querier, nodeName, service)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if agentService != nil {
-			_, err = tx.DeleteFrom(models.AgentServiceView, "WHERE service_id = ? AND agent_id = ?", agentService.ServiceID, agentService.AgentID)
-			if err != nil {
-				return errors.WithStack(err)
-			}
+		if agentService == nil {
+			return nil
 		}
 
-		if agentService == nil && agentNode == nil {
-			return nil
+		_, err = tx.DeleteFrom(models.AgentNodeView, "WHERE agent_id = ?", agentService.AgentID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		_, err = tx.DeleteFrom(models.AgentServiceView, "WHERE service_id = ? AND agent_id = ?", agentService.ServiceID, agentService.AgentID)
+		if err != nil {
+			return errors.WithStack(err)
 		}
 
 		// stop agents
 		var agent models.Agent
-		if agentNode != nil {
-			err = tx.SelectOneTo(&agent, "WHERE id = ?", agentNode.AgentID)
-		} else {
-			err = tx.SelectOneTo(&agent, "WHERE id = ?", agentService.AgentID)
-		}
+		err = tx.SelectOneTo(&agent, "WHERE id = ?", agentService.AgentID)
 		if err == sql.ErrNoRows {
 			return nil
 		}
@@ -435,9 +425,16 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			if err = tx.Reload(&a); err != nil {
 				return errors.WithStack(err)
 			}
+
+			// remove agent
+			err = tx.Delete(&agent)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
 			if svc.rds.RDSExporterPath != "" {
 				// update rds_exporter configuration
-				config, err := svc.rds.UpdateRDSExporterConfig(tx)
+				config, err := svc.rds.UpdateRDSExporterConfig(tx, true)
 				if err != nil {
 					return err
 				}
@@ -460,19 +457,29 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.qan != nil {
+				agentUUID, err := svc.qan.GetAgentUUID()
+				if err != nil {
+					return err
+				}
+
+				<-time.Tick(1 * time.Second) // delay a little bit to avoid duplicate record in qan database
 				if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 					return err
 				}
+
+				go svc.removeQANData(ctx, nodeName, agentUUID, *a.QANDBInstanceUUID)
 			}
 		}
 
 		// remove agent
-		err = tx.Delete(&agent)
-		if err != nil {
-			return errors.WithStack(err)
+		if agent.Type != models.RDSExporterAgentType {
+			err = tx.Delete(&agent)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 
-		err = removeNodeAndService(tx, agentNode, agentService)
+		err = removeNodeAndService(tx, &agentService.AgentService)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -481,6 +488,9 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 		case models.RDSExporterAgentType:
 			return svc.rds.ApplyPrometheusConfiguration(ctx, tx.Querier)
 		case models.MySQLdExporterAgentType:
+			if agentService.NodeType == string(models.RDSNodeType) {
+				return svc.rds.ApplyPrometheusConfiguration(ctx, tx.Querier)
+			}
 			return svc.mysql.ApplyPrometheusConfiguration(ctx, tx.Querier)
 		case models.PostgresExporterAgentType:
 			return svc.postgresql.ApplyPrometheusConfiguration(ctx, tx.Querier)
@@ -504,7 +514,7 @@ func (svc *Service) removeNodeFromPrometheus(ctx context.Context, nodeID string)
 		}
 
 		err = svc.prometheus.DeleteSeries(map[string]string{
-			"instance": nodeName,
+			"instance=": nodeName,
 		})
 		if err != nil {
 			return fmt.Errorf("delete metrics data for %s failed: %s", nodeName, err.Error())
@@ -680,7 +690,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 				}
 				if svc.rds.RDSExporterPath != "" {
 					// update rds_exporter configuration
-					config, err := svc.rds.UpdateRDSExporterConfig(tx)
+					config, err := svc.rds.UpdateRDSExporterConfig(tx, false)
 					if err != nil {
 						return err
 					}
@@ -853,7 +863,7 @@ func (svc *Service) GetRegionFromAgentType(agentType models.AgentType) string {
 
 func (svc *Service) genPromtheusQueries(nodeName string, service string) map[string]string {
 	queries := map[string]string{
-		"instance": nodeName,
+		"instance=": nodeName,
 	}
 
 	agentType := models.AgentType(service)
@@ -861,11 +871,11 @@ func (svc *Service) genPromtheusQueries(nodeName string, service string) map[str
 	case models.MySQLdExporterAgentType, models.PostgresExporterAgentType,
 		models.NodeExporterAgentType, models.ProxySQLExporterAgentType,
 		models.MongoDBExporterAgentType:
-		queries["region"] = string(models.RemoteNodeRegion)
+		queries["region="] = string(models.RemoteNodeRegion)
 	case models.ClientNodeExporterAgentType, models.ClientMySQLdExporterAgentType,
 		models.ClientMongoDBExporterAgentType, models.ClientPostgresExporterAgentType,
 		models.ClientProxySQLExporterAgentType:
-		queries["region"] = string(models.ClientNodeRegion)
+		queries["region="] = string(models.ClientNodeRegion)
 	case models.RDSExporterAgentType:
 		break
 	default:
@@ -874,17 +884,17 @@ func (svc *Service) genPromtheusQueries(nodeName string, service string) map[str
 
 	switch agentType {
 	case models.MySQLdExporterAgentType, models.ClientMySQLdExporterAgentType:
-		queries["job"] = "mysql"
+		queries["job="] = "mysql"
 	case models.PostgresExporterAgentType, models.ClientPostgresExporterAgentType:
-		queries["job"] = "postgresql"
+		queries["job="] = "postgresql"
 	case models.MongoDBExporterAgentType, models.ClientMongoDBExporterAgentType:
-		queries["job"] = "mongodb"
+		queries["job="] = "mongodb"
 	case models.NodeExporterAgentType, models.ClientNodeExporterAgentType:
-		queries["job"] = "linux"
+		queries["job="] = "linux"
 	case models.ProxySQLExporterAgentType, models.ClientProxySQLExporterAgentType:
-		queries["job"] = "proxysql"
+		queries["job="] = "proxysql"
 	case models.RDSExporterAgentType:
-		queries["job"] = "rds"
+		queries["job=~"] = "rds-*"
 	default:
 		return nil
 	}

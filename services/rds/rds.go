@@ -169,10 +169,6 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		ScrapeTimeout:  "55s",
 		MetricsPath:    "/basic",
 		HonorLabels:    true,
-		RelabelConfigs: []prometheus.RelabelConfig{{
-			TargetLabel: "job",
-			Replacement: "rds",
-		}},
 	}
 	rdsEnhanced := &prometheus.ScrapeConfig{
 		JobName:        "rds-enhanced",
@@ -180,10 +176,6 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		ScrapeTimeout:  "9s",
 		MetricsPath:    "/enhanced",
 		HonorLabels:    true,
-		RelabelConfigs: []prometheus.RelabelConfig{{
-			TargetLabel: "job",
-			Replacement: "rds",
-		}},
 	}
 
 	nodes, err := q.FindAllFrom(models.RDSNodeTable, "type", models.RDSNodeType)
@@ -545,7 +537,7 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 	}
 }
 
-func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX) (*rdsExporterConfig, error) {
+func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX, agentRequired bool) (*rdsExporterConfig, error) {
 	// collect all RDS nodes
 	var config rdsExporterConfig
 	nodes, err := tx.FindAllFrom(models.RDSNodeTable, "type", models.RDSNodeType)
@@ -554,6 +546,17 @@ func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX) (*rdsExporterConfig, 
 	}
 	for _, n := range nodes {
 		node := n.(*models.RDSNode)
+
+		if agentRequired {
+			var agent models.Agent
+			err = tx.SelectOneTo(&agent, "WHERE runs_on_node_id = ? AND type = ?", node.ID, models.RDSExporterAgentType)
+			if err != nil && err != sql.ErrNoRows {
+				return nil, errors.WithStack(err)
+			}
+			if err == sql.ErrNoRows {
+				continue
+			}
+		}
 
 		var service models.RDSService
 		if err = tx.FindOneTo(&service, "node_id", node.ID); err != nil {
@@ -630,7 +633,7 @@ func (svc *Service) addRDSExporter(ctx context.Context, tx *reform.TX, service *
 
 	if svc.RDSExporterPath != "" {
 		// update rds_exporter configuration
-		if _, err = svc.UpdateRDSExporterConfig(tx); err != nil {
+		if _, err = svc.UpdateRDSExporterConfig(tx, false); err != nil {
 			return err
 		}
 
@@ -857,7 +860,7 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 				}
 				if svc.RDSExporterPath != "" {
 					// update rds_exporter configuration
-					config, err := svc.UpdateRDSExporterConfig(tx)
+					config, err := svc.UpdateRDSExporterConfig(tx, false)
 					if err != nil {
 						return err
 					}
@@ -953,7 +956,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					return errors.WithStack(err)
 				}
 				if svc.RDSExporterPath != "" {
-					config, err := svc.UpdateRDSExporterConfig(tx)
+					config, err := svc.UpdateRDSExporterConfig(tx, false)
 					if err != nil {
 						return err
 					}
