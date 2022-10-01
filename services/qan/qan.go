@@ -699,7 +699,7 @@ func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID str
 	b := []byte(instanceID)
 
 	if err = svc.sendQANCommand(ctx, qanURL, agentID, command, b); err != nil {
-		logger.Get(ctx).WithField("component", "qan").Errorf("sendQANCommand %s %s %s %s", agentID, instanceID, command, b)
+		logger.Get(ctx).WithField("error", err).WithField("component", "qan").Errorf("sendQANCommand %s %s %s %s", agentID, instanceID, command, b)
 	}
 
 	return svc.removeInstanceFromServer(ctx, qanURL, instanceID)
