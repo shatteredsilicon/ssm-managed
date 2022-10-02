@@ -917,7 +917,7 @@ func (svc *Service) removeQANData(ctx context.Context, nodeID, instanceUUID stri
 	// continually remove qan data incase there are some ongoing qan task
 	retryTimes := 30
 	for i := 0; i < retryTimes; i++ {
-		<-time.Tick(1 * time.Second)
+		<-time.Tick(5 * time.Second)
 
 		err := deleteData()
 		if err != nil {
