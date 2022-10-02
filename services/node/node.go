@@ -229,8 +229,6 @@ func (svc *Service) removeServiceFromPrometheus(ctx context.Context, nodeName, s
 			logrus.Errorf("clean tombstones for %s failed: %s, try %d", nodeName, err.Error(), i+1)
 			continue
 		}
-
-		return nil
 	}
 
 	return fmt.Errorf("delete metrics data for %s failed, tried %d times", nodeName, retryTimes)
@@ -543,8 +541,6 @@ func (svc *Service) removeNodeFromPrometheus(ctx context.Context, nodeID string)
 			logrus.Errorf("clean tombstones for %s failed: %s, try %d", nodeID, err.Error(), i+1)
 			continue
 		}
-
-		return nil
 	}
 
 	return fmt.Errorf("delete metrics data for %s failed, tried %d times", nodeID, retryTimes)
