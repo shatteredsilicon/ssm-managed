@@ -699,14 +699,14 @@ func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID str
 	b := []byte(instanceID)
 
 	if err = svc.sendQANCommand(ctx, qanURL, agentID, command, b); err != nil {
-		logger.Get(ctx).WithField("component", "qan").Errorf("sendQANCommand %s %s %s %s", agentID, instanceID, command, b)
+		logger.Get(ctx).WithField("error", err).WithField("component", "qan").Errorf("sendQANCommand %s %s %s %s", agentID, instanceID, command, b)
 	}
 
 	return svc.removeInstanceFromServer(ctx, qanURL, instanceID)
 }
 
 // RemoveQANData remove qan data
-func (svc *Service) RemoveQANData(ctx context.Context, agentID, instanceID string) error {
+func (svc *Service) RemoveQANData(ctx context.Context, instanceID string) error {
 	qanURL, err := svc.ensureAgentIsRegistered(ctx)
 	if err != nil {
 		return err
@@ -721,8 +721,8 @@ func (svc *Service) GetAgentUUIDFromDB(ctx context.Context, clientName string, s
 SELECT ins1.uuid
 FROM instances ins1
 JOIN instances ins2 ON ins1.parent_uuid = ins2.parent_uuid
-WHERE ins1.subsystem_id = ? AND ins2.name = ? AND ins2.subsystem_id = ?
-`, SubsystemAgent, clientName, subsystem).Scan(&uuid)
+WHERE ins1.subsystem_id = ? AND ins2.name = ? AND ins2.subsystem_id = ? AND (ins2.deleted IS NULL OR ins2.deleted = ?)
+`, SubsystemAgent, clientName, subsystem, qanDeletedTimeZero).Scan(&uuid)
 
 	return
 }
