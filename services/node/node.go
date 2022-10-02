@@ -306,15 +306,18 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 
 		// remove mysql qan queries
 		agentUUID, err := svc.qan.GetAgentUUIDFromDB(ctx, nodeID, node.SubsystemID)
-		if err != nil {
-			return err
-		}
-		err = svc.qan.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return err
 		}
 
-		go svc.removeQANData(ctx, nodeID, agentUUID, node.InstanceUUID)
+		if err == nil {
+			err = svc.qan.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
+			if err != nil {
+				return err
+			}
+		}
+
+		go svc.removeQANData(ctx, nodeID, node.InstanceUUID)
 	}
 
 	return nil
@@ -457,17 +460,12 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.qan != nil {
-				agentUUID, err := svc.qan.GetAgentUUID()
-				if err != nil {
-					return err
-				}
-
 				<-time.Tick(1 * time.Second) // delay a little bit to avoid duplicate record in qan database
 				if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 					return err
 				}
 
-				go svc.removeQANData(ctx, nodeName, agentUUID, *a.QANDBInstanceUUID)
+				go svc.removeQANData(ctx, nodeName, *a.QANDBInstanceUUID)
 			}
 		}
 
@@ -573,16 +571,18 @@ func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error 
 
 		// remove mysql qan queries
 		agentUUID, err := svc.qan.GetAgentUUIDFromDB(ctx, nodeID, node.SubsystemID)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return err
 		}
 
-		err = svc.qan.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
-		if err != nil {
-			return err
+		if err == nil {
+			err = svc.qan.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
+			if err != nil {
+				return err
+			}
 		}
 
-		go svc.removeQANData(ctx, nodeID, agentUUID, node.InstanceUUID)
+		go svc.removeQANData(ctx, nodeID, node.InstanceUUID)
 	}
 
 	return nil
@@ -713,17 +713,12 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 					return errors.WithStack(err)
 				}
 				if svc.qan != nil {
-					agentUUID, err := svc.qan.GetAgentUUID()
-					if err != nil {
-						return err
-					}
-
 					<-time.Tick(1 * time.Second) // delay a little bit to avoid duplicate record in qan database
 					if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 						return err
 					}
 
-					go svc.removeQANData(ctx, nodeID, agentUUID, *a.QANDBInstanceUUID)
+					go svc.removeQANData(ctx, nodeID, *a.QANDBInstanceUUID)
 				}
 			}
 		}
@@ -902,7 +897,7 @@ func (svc *Service) genPromtheusQueries(nodeName string, service string) map[str
 	return queries
 }
 
-func (svc *Service) removeQANData(ctx context.Context, nodeID, agentUUID, instanceUUID string) {
+func (svc *Service) removeQANData(ctx context.Context, nodeID, instanceUUID string) {
 	deleteData := func() error {
 		nodes, err := svc.GetQanNodes(ctx, nodeID, false)
 		if err != nil {
@@ -915,7 +910,7 @@ func (svc *Service) removeQANData(ctx context.Context, nodeID, agentUUID, instan
 			}
 		}
 
-		return svc.qan.RemoveQANData(ctx, agentUUID, instanceUUID)
+		return svc.qan.RemoveQANData(ctx, instanceUUID)
 	}
 
 	deleteData()
@@ -926,7 +921,7 @@ func (svc *Service) removeQANData(ctx context.Context, nodeID, agentUUID, instan
 
 		err := deleteData()
 		if err != nil {
-			logrus.Errorf("remove qan data for %s-%s-%s failed: %+v", nodeID, agentUUID, instanceUUID, err)
+			logrus.Errorf("remove qan data for %s-%s failed: %+v", nodeID, instanceUUID, err)
 		}
 	}
 }
