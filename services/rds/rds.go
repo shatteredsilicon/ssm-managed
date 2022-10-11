@@ -309,7 +309,7 @@ func (svc *Service) Discover(ctx context.Context, accessKey, secretKey string) (
 
 				out, err := rds.New(s).DescribeDBInstancesWithContext(ctx, new(rds.DescribeDBInstancesInput))
 				if err != nil {
-					l.Error(err)
+					l.WithField("region", region).Error(err)
 
 					if err, ok := err.(awserr.Error); ok {
 						if err.OrigErr() != nil && err.OrigErr() == ctx.Err() {
