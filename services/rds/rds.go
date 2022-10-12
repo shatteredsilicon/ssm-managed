@@ -703,6 +703,8 @@ func (svc *Service) MySQLServiceFromRDSService(service *models.RDSService) *mode
 }
 
 func (svc *Service) Add(ctx context.Context, accessKey, secretKey string, id *InstanceID, username, password string) error {
+	l := logger.Get(ctx).WithField("component", "rds-add")
+
 	if id.Name == "" {
 		return status.Error(codes.InvalidArgument, "RDS instance name is not given.")
 	}
@@ -715,7 +717,12 @@ func (svc *Service) Add(ctx context.Context, accessKey, secretKey string, id *In
 
 	instances, err := svc.Discover(ctx, accessKey, secretKey)
 	if err != nil {
-		return err
+		l.Error(err)
+
+		// ignore error if there are some results
+		if len(instances) == 0 {
+			return err
+		}
 	}
 
 	var add *Instance
