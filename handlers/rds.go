@@ -32,7 +32,6 @@ func (s *RDSServer) Discover(ctx context.Context, req *api.RDSDiscoverRequest) (
 	res, err := s.RDS.Discover(ctx, req.AwsAccessKeyId, req.AwsSecretAccessKey)
 	if err != nil {
 		logger.Get(ctx).Errorf("%+v", err)
-		return nil, err
 	}
 
 	var resp api.RDSDiscoverResponse
@@ -50,7 +49,12 @@ func (s *RDSServer) Discover(ctx context.Context, req *api.RDSDiscoverRequest) (
 			},
 		})
 	}
-	return &resp, nil
+
+	if len(resp.Instances) > 0 {
+		return &resp, nil
+	}
+
+	return &resp, err
 }
 
 func (s *RDSServer) List(ctx context.Context, req *api.RDSListRequest) (*api.RDSListResponse, error) {
