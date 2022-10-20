@@ -211,8 +211,6 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 				sc := prometheus.StaticConfig{
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
-						{Name: "aws_region", Value: node.Region},
-						{Name: "region", Value: string(models.RemoteNodeRegion)},
 						{Name: "instance", Value: node.Name},
 					},
 				}
@@ -230,8 +228,6 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 				sc := prometheus.StaticConfig{
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
-						{Name: "aws_region", Value: node.Region},
-						{Name: "region", Value: string(models.RemoteNodeRegion)},
 						{Name: "instance", Value: node.Name},
 					},
 				}
