@@ -125,10 +125,14 @@ func (s *RDSServer) Detail(ctx context.Context, req *api.RDSDetailRequest) (*api
 	}
 
 	resp := api.RDSDetailResponse{
-		AwsAccessKeyId:     *svc.AWSAccessKey,
-		AwsSecretAccessKey: *svc.AWSSecretKey,
-		Region:             svc.Region,
-		Instance:           svc.Instance,
+		Region:   svc.Region,
+		Instance: svc.Instance,
+	}
+	if svc.AWSAccessKey != nil {
+		resp.AwsAccessKeyId = *svc.AWSAccessKey
+	}
+	if svc.AWSSecretKey != nil {
+		resp.AwsSecretAccessKey = *svc.AWSSecretKey
 	}
 	return &resp, nil
 }
