@@ -116,6 +116,10 @@ func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, erro
 		args = append(args, "-server-pass="+pass)
 	}
 
+	if os.Getenv("QAN_FILTER_OMIT") != "" {
+		args = append(args, fmt.Sprintf("-filter-omit=%s", os.Getenv("QAN_FILTER_OMIT")))
+	}
+
 	args = append(args, qanURL.String()) // full URL, with username and password (yes, again! that's how installer is written)
 	cmd := exec.Command(path, args...)
 	l.Debug(strings.Join(cmd.Args, " "))
