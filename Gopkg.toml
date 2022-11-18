@@ -59,3 +59,7 @@ ignored = [
 [[override]]
   name = 'github.com/prometheus/common'
   version = "~v0.26.0"
+
+[[override]]
+  name = "github.com/shatteredsilicon/ssm"
+  branch = "1.x"
