@@ -1,3 +1,8 @@
 /.vscode/
-
+vendor/
 cover.out
+models/*_reform.go
+api/*.pb.*
+api/swagger/*.json
+api/swagger/client/
+api/swagger/models/

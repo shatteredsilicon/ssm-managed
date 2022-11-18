@@ -198,14 +198,12 @@
   name = "github.com/go-openapi/runtime"
   packages = [
     ".",
-    "client",
     "logger",
     "middleware",
     "middleware/denco",
     "middleware/header",
     "middleware/untyped",
     "security",
-    "yamlpc",
   ]
   pruneopts = "T"
   revision = "3f9800fb72fae00e99a99db505da3b330f847e8e"
@@ -555,18 +553,6 @@
   version = "v2.0.2"
 
 [[projects]]
-  digest = "1:abe0aa36f73069c003bbbcb1a0837eea6eb7b5b2e876d6cf34d454b02d9b3873"
-  name = "github.com/opentracing/opentracing-go"
-  packages = [
-    ".",
-    "ext",
-    "log",
-  ]
-  pruneopts = "T"
-  revision = "d34af3eaa63c4d08ab54863a4bdd0daa45212e12"
-  version = "v1.2.0"
-
-[[projects]]
   digest = "1:07f070512bbd2e850e85d76affda836d78192886291be52280fd5cec64484c05"
   name = "github.com/pelletier/go-toml"
   packages = ["."]
@@ -643,6 +629,14 @@
   version = "v0.7.3"
 
 [[projects]]
+  digest = "1:b966ac707f293c58ebff5689d7c240199044c5728d3df818ded0139b3256fbd5"
+  name = "github.com/revel/config"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "a81c4105c36841d27e529f875b6062da7b8f986c"
+  version = "v1.1.0"
+
+[[projects]]
   digest = "1:4962827859ddcf215687664f115db56b7e914fc3fe52200e8cbcfe6bee823028"
   name = "github.com/rogpeppe/go-internal"
   packages = ["fmtsort"]
@@ -677,14 +671,14 @@
 
 [[projects]]
   branch = "1.x"
-  digest = "1:9b3e5d8ef50d439b1932f59dcc05378178a93203534e7ecd63c4f8e6d5773e45"
+  digest = "1:a480f885ffb34f9d5a2c761d127250c98d9357a8a77ce27c08dbb839d432c054"
   name = "github.com/shatteredsilicon/ssm"
   packages = [
     "proto",
     "proto/config",
   ]
   pruneopts = "T"
-  revision = "7e70b7911b75f768bb9521c5064145a8c2279637"
+  revision = "b00aab5447e7f481eec150bc4fd6ba1137260b4f"
 
 [[projects]]
   digest = "1:9fb5aea4972dbabf1b387366b1464e564b9d66fca5e6f1a931ea3e2661e61999"
@@ -1070,22 +1064,14 @@
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/rds",
     "github.com/cespare/xxhash",
-    "github.com/go-openapi/errors",
-    "github.com/go-openapi/runtime",
-    "github.com/go-openapi/runtime/client",
-    "github.com/go-openapi/strfmt",
-    "github.com/go-openapi/swag",
-    "github.com/go-openapi/validate",
     "github.com/go-sql-driver/mysql",
     "github.com/go-swagger/go-swagger/cmd/swagger",
-    "github.com/golang/protobuf/proto",
     "github.com/golang/protobuf/protoc-gen-go",
     "github.com/google/uuid",
     "github.com/grpc-ecosystem/go-grpc-prometheus",
     "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway",
     "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger",
     "github.com/grpc-ecosystem/grpc-gateway/runtime",
-    "github.com/grpc-ecosystem/grpc-gateway/utilities",
     "github.com/hashicorp/consul/api",
     "github.com/lib/pq",
     "github.com/percona/kardianos-service",
@@ -1093,6 +1079,7 @@
     "github.com/pmezard/go-difflib/difflib",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/common/model",
+    "github.com/revel/config",
     "github.com/shatteredsilicon/promconfig/common/config",
     "github.com/shatteredsilicon/promconfig/config",
     "github.com/shatteredsilicon/promconfig/discovery/config",
@@ -1106,7 +1093,6 @@
     "github.com/vektra/mockery/cmd/mockery",
     "golang.org/x/net/context",
     "golang.org/x/sync/errgroup",
-    "google.golang.org/genproto/googleapis/api/annotations",
     "google.golang.org/genproto/googleapis/rpc/status",
     "google.golang.org/grpc",
     "google.golang.org/grpc/codes",

@@ -116,10 +116,6 @@ func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, erro
 		args = append(args, "-server-pass="+pass)
 	}
 
-	if os.Getenv("QAN_FILTER_OMIT") != "" {
-		args = append(args, fmt.Sprintf("-filter-omit=%s", os.Getenv("QAN_FILTER_OMIT")))
-	}
-
 	args = append(args, qanURL.String()) // full URL, with username and password (yes, again! that's how installer is written)
 	cmd := exec.Command(path, args...)
 	l.Debug(strings.Join(cmd.Args, " "))
@@ -193,11 +189,15 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 	}
 
 	command := "StartTool"
-	config := map[string]interface{}{
-		"UUID":           dbInstance.UUID,
-		"CollectFrom":    "perfschema",
-		"Interval":       60,
-		"ExampleQueries": true,
+	exampleQueries := true
+	config := config.QAN{
+		UUID:           dbInstance.UUID,
+		CollectFrom:    "perfschema",
+		Interval:       60,
+		ExampleQueries: &exampleQueries,
+	}
+	if os.Getenv("QAN_FILTER_OMIT") != "" {
+		config.FilterOmit = strings.Split(os.Getenv("QAN_FILTER_OMIT"), ",")
 	}
 
 	b, err := json.Marshal(config)
@@ -647,11 +647,15 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	}
 
 	command := "StartTool"
-	config := map[string]interface{}{
-		"UUID":           instance.UUID,
-		"CollectFrom":    collectFrom,
-		"Interval":       60,
-		"ExampleQueries": true,
+	exampleQueries := true
+	config := config.QAN{
+		UUID:           instance.UUID,
+		CollectFrom:    collectFrom,
+		Interval:       60,
+		ExampleQueries: &exampleQueries,
+	}
+	if os.Getenv("QAN_FILTER_OMIT") != "" {
+		config.FilterOmit = strings.Split(os.Getenv("QAN_FILTER_OMIT"), ",")
 	}
 
 	b, err = json.Marshal(config)
