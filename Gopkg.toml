@@ -63,3 +63,7 @@ ignored = [
 [[override]]
   name = "github.com/shatteredsilicon/ssm"
   branch = "1.x"
+
+[[override]]
+  name = "github.com/shatteredsilicon/snmp_exporter"
+  branch = "ssm-1.x"

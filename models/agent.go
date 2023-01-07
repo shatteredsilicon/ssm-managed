@@ -44,6 +44,7 @@ const (
 	NodeExporterAgentType           AgentType = "node_exporter"
 	ProxySQLExporterAgentType       AgentType = "proxysql_exporter"
 	MongoDBExporterAgentType        AgentType = "mongodb_exporter"
+	SNMPExporterAgentType           AgentType = "snmp_exporter"
 	ClientNodeExporterAgentType     AgentType = "linux:metrics"
 	ClientMySQLdExporterAgentType   AgentType = "mysql:metrics"
 	ClientMySQLQanAgentAgentType    AgentType = "mysql:queries"
@@ -183,4 +184,33 @@ func (q *QanAgent) DSN(service *MySQLService) string {
 	// TODO TLSConfig: "true", https://jira.percona.com/browse/PMM-1727
 	// TODO Other parameters?
 	return cfg.FormatDSN()
+}
+
+//reform:agents
+// SNMPExporter exports SNMP metrics.
+type SNMPExporter struct {
+	ID           int32     `reform:"id,pk"`
+	Type         AgentType `reform:"type"`
+	RunsOnNodeID int32     `reform:"runs_on_node_id"`
+
+	ServiceUsername *string `reform:"service_username"`
+	ServicePassword *string `reform:"service_password"`
+	ListenPort      *uint16 `reform:"listen_port"`
+}
+
+// DSN returns DSN for SNMP service.
+func (p *SNMPExporter) DSN(service *SNMPService) string {
+	q := make(url.Values)
+	q.Set("sslmode", "disable") // TODO https://jira.percona.com/browse/PMM-1727
+	q.Set("connect_timeout", strconv.Itoa(int(sqlDialTimeout.Seconds())))
+
+	address := net.JoinHostPort(*service.Address, strconv.Itoa(int(*service.Port)))
+	uri := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(*p.ServiceUsername, *p.ServicePassword),
+		Host:     address,
+		Path:     "postgres",
+		RawQuery: q.Encode(),
+	}
+	return uri.String()
 }

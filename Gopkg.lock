@@ -321,6 +321,14 @@
   version = "v1.5.1"
 
 [[projects]]
+  digest = "1:52d5b177369a4ed6ce67685f9b2a051fb92d56a900140e90a50252dff623dda2"
+  name = "github.com/gosnmp/gosnmp"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "33df32e33fbd043727a4a117a0ef6f2183607113"
+  version = "v1.35.0"
+
+[[projects]]
   digest = "1:49628f00461155f68308d97672e4345c78faa0bbde072c5a78f6bd92434297e9"
   name = "github.com/grpc-ecosystem/go-grpc-prometheus"
   packages = ["."]
@@ -668,6 +676,14 @@
   ]
   pruneopts = "T"
   revision = "92898df3db18a178f9731d1d68fbbe7597a2c8a3"
+
+[[projects]]
+  branch = "ssm-1.x"
+  digest = "1:a33786a7a6ba4c1dfb9033450f7953457081b45ee707e7f0e8824d1bf86726c1"
+  name = "github.com/shatteredsilicon/snmp_exporter"
+  packages = ["config"]
+  pruneopts = "T"
+  revision = "f50b76c819677ac8c3a7c6b7e0e5401005616c68"
 
 [[projects]]
   branch = "1.x"
@@ -1084,6 +1100,7 @@
     "github.com/shatteredsilicon/promconfig/config",
     "github.com/shatteredsilicon/promconfig/discovery/config",
     "github.com/shatteredsilicon/promconfig/discovery/targetgroup",
+    "github.com/shatteredsilicon/snmp_exporter/config",
     "github.com/shatteredsilicon/ssm/proto",
     "github.com/shatteredsilicon/ssm/proto/config",
     "github.com/sirupsen/logrus",

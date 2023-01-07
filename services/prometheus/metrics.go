@@ -32,6 +32,7 @@ var scrapePoolServiceMap = map[string]models.AgentType{
 	"rds-mysql-lr":      models.MySQLdExporterAgentType,
 	"rds-basic":         models.RDSExporterAgentType,
 	"rds-enhanced":      models.RDSExporterAgentType,
+	"snmp":              models.SNMPExporterAgentType,
 }
 
 // TargetActiveTarget active target structure of prometheus GET targets api

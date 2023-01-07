@@ -59,6 +59,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/rds"
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
+	"github.com/shatteredsilicon/ssm-managed/services/snmp"
 	"github.com/shatteredsilicon/ssm-managed/services/supervisor"
 	"github.com/shatteredsilicon/ssm-managed/services/telemetry"
 	"github.com/shatteredsilicon/ssm-managed/utils"
@@ -97,6 +98,9 @@ var (
 	agentPostgresExporterF  = flag.String("agent-postgres-exporter", "/opt/ss/ssm-client/postgres_exporter", "postgres_exporter path")
 	agentRDSExporterF       = flag.String("agent-rds-exporter", "/usr/sbin/rds_exporter", "rds_exporter path")
 	agentRDSExporterConfigF = flag.String("agent-rds-exporter-config", "/etc/ssm-rds-exporter.yml", "rds_exporter configuration file path")
+	agentSNMPExporterF      = flag.String("agent-snmp-exporter", "/opt/ss/snmp_exporter/bin/snmp_exporter", "snmp_exporter path")
+	snmpGeneratorF          = flag.String("snmp-generator", "/opt/ss/snmp_exporter/bin/generator", "snmp_generator path")
+	agentSNMPConfigDirF     = flag.String("agent-snmp-config-dir", "/opt/ss/snmp_exporter", "snmp_exporter config directory")
 	agentQANBaseF           = flag.String("agent-qan-base", "/opt/ss/qan-agent", "qan-agent installation base path")
 
 	rdsEnableGovCloud = flag.Bool("rds-enable-gov-cloud", false, "Enable GOV cloud for RDS")
@@ -203,6 +207,32 @@ func makeRDSService(ctx context.Context, deps *serviceDependencies) (*rds.Servic
 	return rdsService, nil
 }
 
+func makeSNMPService(ctx context.Context, deps *serviceDependencies) (*snmp.Service, error) {
+	snmpConfig := snmp.ServiceConfig{
+		SNMPExporterPath:  *agentSNMPExporterF,
+		SNMPGeneratorPath: *snmpGeneratorF,
+		SNMPConfigDir:     *agentSNMPConfigDirF,
+
+		Prometheus:    deps.prometheus,
+		Supervisor:    deps.supervisor,
+		DB:            deps.db,
+		PortsRegistry: deps.portsRegistry,
+	}
+	snmpService, err := snmp.NewService(&snmpConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = deps.db.InTransaction(func(tx *reform.TX) error {
+		return snmpService.ApplyPrometheusConfiguration(ctx, tx.Querier)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return snmpService, nil
+}
+
 func makeMySQLService(ctx context.Context, deps *serviceDependencies) (*mysql.Service, error) {
 	serviceConfig := mysql.ServiceConfig{
 		MySQLdExporterPath: *agentMySQLdExporterF,
@@ -270,6 +300,7 @@ type grpcServerDependencies struct {
 	rds          *rds.Service
 	mysql        *mysql.Service
 	postgres     *postgresql.Service
+	snmp         *snmp.Service
 	remote       *remote.Service
 	logs         *logs.Logs
 	node         *node.Service
@@ -299,6 +330,9 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 	})
 	api.RegisterPostgreSQLServer(gRPCServer, &handlers.PostgreSQLServer{
 		PostgreSQL: deps.postgres,
+	})
+	api.RegisterSNMPServer(gRPCServer, &handlers.SNMPServer{
+		SNMP: deps.snmp,
 	})
 	api.RegisterRemoteServer(gRPCServer, &handlers.RemoteServer{
 		Remote: deps.remote,
@@ -358,6 +392,7 @@ func runRESTServer(ctx context.Context, logs *logs.Logs) {
 		api.RegisterRDSHandlerFromEndpoint,
 		api.RegisterMySQLHandlerFromEndpoint,
 		api.RegisterPostgreSQLHandlerFromEndpoint,
+		api.RegisterSNMPHandlerFromEndpoint,
 		api.RegisterRemoteHandlerFromEndpoint,
 		api.RegisterLogsHandlerFromEndpoint,
 		api.RegisterAnnotationsHandlerFromEndpoint,
@@ -591,6 +626,11 @@ func main() {
 		l.Panicf("PostgreSQL service problem: %+v", err)
 	}
 
+	snmp, err := makeSNMPService(ctx, deps)
+	if err != nil {
+		l.Panicf("SNMP service problem: %+v", err)
+	}
+
 	remoteService, err := remote.NewService(&remote.ServiceConfig{
 		DB: deps.db,
 	})
@@ -600,7 +640,7 @@ func main() {
 
 	logs := logs.New(utils.Version, consulClient, db, rds, nil)
 
-	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, deps.db, mysqlService, postgres, rds)
+	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, deps.db, mysqlService, postgres, rds, snmp)
 
 	var wg sync.WaitGroup
 
@@ -612,6 +652,7 @@ func main() {
 			rds:                 rds,
 			postgres:            postgres,
 			mysql:               mysqlService,
+			snmp:                snmp,
 			remote:              remoteService,
 			consulClient:        consulClient,
 			logs:                logs,
