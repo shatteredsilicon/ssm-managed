@@ -16,6 +16,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/rds"
+	"github.com/shatteredsilicon/ssm-managed/services/snmp"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/reform.v1"
@@ -34,12 +35,13 @@ type Service struct {
 	mysql      *mysql.Service
 	postgresql *postgresql.Service
 	rds        *rds.Service
+	snmp       *snmp.Service
 }
 
 func NewService(
 	consul *consul.Client, qan *qan.Service, prometheus *prometheus.Service,
 	db *reform.DB, mysql *mysql.Service, postgresql *postgresql.Service,
-	rds *rds.Service,
+	rds *rds.Service, snmp *snmp.Service,
 ) *Service {
 	return &Service{
 		consul:     consul,
@@ -49,6 +51,7 @@ func NewService(
 		mysql:      mysql,
 		postgresql: postgresql,
 		rds:        rds,
+		snmp:       snmp,
 	}
 }
 
@@ -465,6 +468,17 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 
 				go svc.removeQANData(ctx, nodeName, *a.QANDBInstanceUUID)
 			}
+
+		case models.SNMPExporterAgentType:
+			a := models.SNMPExporter{ID: agent.ID}
+			if err = tx.Reload(&a); err != nil {
+				return errors.WithStack(err)
+			}
+			if svc.snmp.SNMPExporterPath != "" {
+				if err = svc.snmp.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+					return err
+				}
+			}
 		}
 
 		// remove agent
@@ -490,6 +504,8 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			return svc.mysql.ApplyPrometheusConfiguration(ctx, tx.Querier)
 		case models.PostgresExporterAgentType:
 			return svc.postgresql.ApplyPrometheusConfiguration(ctx, tx.Querier)
+		case models.SNMPExporterAgentType:
+			return svc.snmp.ApplyPrometheusConfiguration(ctx, tx.Querier)
 		}
 
 		return nil
@@ -716,6 +732,17 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 
 					go svc.removeQANData(ctx, nodeID, *a.QANDBInstanceUUID)
 				}
+
+			case models.SNMPExporterAgentType:
+				a := models.SNMPExporter{ID: agent.ID}
+				if err = tx.Reload(&a); err != nil {
+					return errors.WithStack(err)
+				}
+				if svc.snmp.SNMPExporterPath != "" {
+					if err = svc.snmp.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+						return err
+					}
+				}
 			}
 		}
 
@@ -755,8 +782,14 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 			return errors.WithStack(err)
 		}
 
-		// // reconfigure rds prometheus
+		// reconfigure rds prometheus
 		err = svc.rds.ApplyPrometheusConfiguration(ctx, tx.Querier)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// reconfigure snmp prometheus
+		err = svc.snmp.ApplyPrometheusConfiguration(ctx, tx.Querier)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -840,7 +873,7 @@ func (svc *Service) GetRegionFromAgentType(agentType models.AgentType) string {
 	case models.MySQLdExporterAgentType, models.PostgresExporterAgentType,
 		models.RDSExporterAgentType, models.QanAgentAgentType,
 		models.NodeExporterAgentType, models.ProxySQLExporterAgentType,
-		models.MongoDBExporterAgentType:
+		models.MongoDBExporterAgentType, models.SNMPExporterAgentType:
 		return string(models.RemoteNodeRegion)
 	case models.ClientNodeExporterAgentType, models.ClientMySQLdExporterAgentType,
 		models.ClientMySQLQanAgentAgentType, models.ClientMongoDBExporterAgentType,
@@ -867,7 +900,7 @@ func (svc *Service) genPromtheusQueries(nodeName string, service string) map[str
 		models.ClientMongoDBExporterAgentType, models.ClientPostgresExporterAgentType,
 		models.ClientProxySQLExporterAgentType:
 		queries["region="] = string(models.ClientNodeRegion)
-	case models.RDSExporterAgentType:
+	case models.RDSExporterAgentType, models.SNMPExporterAgentType:
 		break
 	default:
 		return nil
@@ -886,6 +919,8 @@ func (svc *Service) genPromtheusQueries(nodeName string, service string) map[str
 		queries["job="] = "proxysql"
 	case models.RDSExporterAgentType:
 		queries["job=~"] = "rds-*"
+	case models.SNMPExporterAgentType:
+		queries["job="] = "snmp"
 	default:
 		return nil
 	}

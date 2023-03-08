@@ -543,6 +543,9 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
+		if len(mySQLServices) == 0 {
+			continue
+		}
 		if len(mySQLServices) != 1 {
 			return errors.Errorf("expected to fetch 1 record, fetched %d. %v", len(mySQLServices), mySQLServices)
 		}

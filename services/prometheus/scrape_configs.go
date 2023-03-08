@@ -52,8 +52,9 @@ type StaticConfig struct {
 }
 
 type RelabelConfig struct {
-	TargetLabel string
-	Replacement string
+	SourceLabels model.LabelNames
+	TargetLabel  string
+	Replacement  string
 }
 
 type BasicAuth struct {
@@ -72,6 +73,7 @@ type ScrapeConfig struct {
 	MetricsPath    string
 	HonorLabels    bool
 	Scheme         string
+	Params         url.Values
 	BasicAuth      *BasicAuth
 	TLSConfig      TLSConfig
 	StaticConfigs  []StaticConfig

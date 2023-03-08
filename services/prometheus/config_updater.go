@@ -145,8 +145,9 @@ func convertScrapeConfig(cfg *ScrapeConfig) (*config.ScrapeConfig, error) {
 	relabelConfigs := make([]*config.RelabelConfig, len(cfg.RelabelConfigs))
 	for i, rc := range cfg.RelabelConfigs {
 		relabelConfigs[i] = &config.RelabelConfig{
-			TargetLabel: rc.TargetLabel,
-			Replacement: rc.Replacement,
+			SourceLabels: rc.SourceLabels,
+			TargetLabel:  rc.TargetLabel,
+			Replacement:  rc.Replacement,
 		}
 	}
 
@@ -157,6 +158,7 @@ func convertScrapeConfig(cfg *ScrapeConfig) (*config.ScrapeConfig, error) {
 		MetricsPath:    cfg.MetricsPath,
 		HonorLabels:    cfg.HonorLabels,
 		Scheme:         cfg.Scheme,
+		Params:         cfg.Params,
 		HTTPClientConfig: config_url.HTTPClientConfig{
 			BasicAuth: basicAuth,
 			TLSConfig: config_url.TLSConfig{
