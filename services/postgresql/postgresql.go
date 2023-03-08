@@ -473,14 +473,11 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 		if e != nil {
 			return errors.WithStack(e)
 		}
-		if len(postgreSQLServices) != 1 {
-			return errors.Errorf("expected to fetch 1 record, fetched %d. %v", len(postgreSQLServices), postgreSQLServices)
-		}
-		service := postgreSQLServices[0].(*models.PostgreSQLService)
-		if service.Type != models.PostgreSQLServiceType {
+		if len(postgreSQLServices) == 0 {
 			continue
 		}
 
+		service := postgreSQLServices[0].(*models.PostgreSQLService)
 		agents, err := models.AgentsForServiceID(tx.Querier, service.ID)
 		if err != nil {
 			return err
