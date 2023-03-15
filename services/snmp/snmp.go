@@ -167,6 +167,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 					Targets: []string{fmt.Sprintf("%s:%d", *service.Address, *service.Port)},
 					Labels: []prometheus.LabelPair{
 						{Name: "instance", Value: node.Name},
+						{Name: "real_job", Value: "snmp"},
 					},
 				}
 				snmp.StaticConfigs = append(snmp.StaticConfigs, sc)
