@@ -116,8 +116,8 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 				TargetLabel:  "__param_target",
 			},
 			{
-				SourceLabels: prometheusModel.LabelNames{"__param_target"},
-				TargetLabel:  "host",
+				TargetLabel: "job",
+				Replacement: "linux",
 			},
 		},
 	}

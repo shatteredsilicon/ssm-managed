@@ -898,14 +898,12 @@ func (svc *Service) genPrometheusQueries(nodeName string, service string) map[st
 		queries["job="] = "postgresql"
 	case models.MongoDBExporterAgentType, models.ClientMongoDBExporterAgentType:
 		queries["job="] = "mongodb"
-	case models.NodeExporterAgentType, models.ClientNodeExporterAgentType:
+	case models.NodeExporterAgentType, models.ClientNodeExporterAgentType, models.SNMPExporterAgentType:
 		queries["job="] = "linux"
 	case models.ProxySQLExporterAgentType, models.ClientProxySQLExporterAgentType:
 		queries["job="] = "proxysql"
 	case models.RDSExporterAgentType:
 		queries["job=~"] = "rds-*"
-	case models.SNMPExporterAgentType:
-		queries["job="] = "snmp"
 	default:
 		return nil
 	}
