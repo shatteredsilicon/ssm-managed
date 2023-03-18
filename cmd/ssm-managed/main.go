@@ -233,7 +233,7 @@ func makeSNMPService(ctx context.Context, deps *serviceDependencies) (*snmp.Serv
 	return snmpService, nil
 }
 
-func makeMySQLService(ctx context.Context, deps *serviceDependencies) (*mysql.Service, error) {
+func makeMySQLService(ctx context.Context, deps *serviceDependencies, consul *consul.Client) (*mysql.Service, error) {
 	serviceConfig := mysql.ServiceConfig{
 		MySQLdExporterPath: *agentMySQLdExporterF,
 
@@ -242,6 +242,7 @@ func makeMySQLService(ctx context.Context, deps *serviceDependencies) (*mysql.Se
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
 		QAN:           deps.qan,
+		Consul:        consul,
 	}
 	mysqlService, err := mysql.NewService(&serviceConfig)
 	if err != nil {
@@ -264,7 +265,7 @@ func makeMySQLService(ctx context.Context, deps *serviceDependencies) (*mysql.Se
 	return mysqlService, nil
 }
 
-func makePostgreSQLService(ctx context.Context, deps *serviceDependencies) (*postgresql.Service, error) {
+func makePostgreSQLService(ctx context.Context, deps *serviceDependencies, consul *consul.Client) (*postgresql.Service, error) {
 	serviceConfig := postgresql.ServiceConfig{
 		PostgresExporterPath: *agentPostgresExporterF,
 
@@ -272,6 +273,7 @@ func makePostgreSQLService(ctx context.Context, deps *serviceDependencies) (*pos
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
+		Consul:        consul,
 	}
 	postgresqlService, err := postgresql.NewService(&serviceConfig)
 	if err != nil {
@@ -616,12 +618,12 @@ func main() {
 		l.Panicf("RDS service problem: %+v", err)
 	}
 
-	mysqlService, err := makeMySQLService(ctx, deps)
+	mysqlService, err := makeMySQLService(ctx, deps, consulClient)
 	if err != nil {
 		l.Panicf("MySQL service problem: %+v", err)
 	}
 
-	postgres, err := makePostgreSQLService(ctx, deps)
+	postgres, err := makePostgreSQLService(ctx, deps, consulClient)
 	if err != nil {
 		l.Panicf("PostgreSQL service problem: %+v", err)
 	}

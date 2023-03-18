@@ -38,6 +38,7 @@ import (
 
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
@@ -63,6 +64,7 @@ type ServiceConfig struct {
 	Supervisor    services.Supervisor
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
+	Consul        *consul.Client
 }
 
 // Service is responsible for interactions with PostgreSQL.
@@ -148,7 +150,6 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
 						{Name: "instance", Value: node.Name},
-						{Name: "region", Value: string(models.RemoteNodeRegion)},
 					},
 				}
 				postgreSQLConfig.StaticConfigs = append(postgreSQLConfig.StaticConfigs, sc)
@@ -226,8 +227,17 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 		name = address
 	}
 
+	// check if instance is added on client side
+	added, err := svc.clientInstanceAdded(ctx, name)
+	if err != nil {
+		return 0, err
+	}
+	if added {
+		return 0, status.Error(codes.AlreadyExists, fmt.Sprintf("PostgreSQL instance with name %s is already added", name))
+	}
+
 	var id int32
-	err := svc.DB.InTransaction(func(tx *reform.TX) error {
+	err = svc.DB.InTransaction(func(tx *reform.TX) error {
 		// insert node
 		node := &models.RemoteNode{
 			Type:   models.RemoteNodeType,
@@ -273,6 +283,28 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 	})
 
 	return id, err
+}
+
+func (svc *Service) clientInstanceAdded(ctx context.Context, name string) (bool, error) {
+	node, err := svc.Consul.GetNode(name)
+	if err != nil {
+		logger.Get(ctx).Errorf("get consul services from node failed: %+v", err)
+		return false, err
+	}
+
+	if node == nil {
+		return false, nil
+	}
+
+	for _, service := range node.Services {
+		t := models.AgentType(service.Service)
+		if t == models.ClientPostgresExporterAgentType {
+			// instance is added on client side
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (svc *Service) engineAndEngineVersion(ctx context.Context, host string, port uint32, username string, password string) (string, string, error) {

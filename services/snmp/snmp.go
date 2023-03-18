@@ -116,8 +116,8 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 				TargetLabel:  "__param_target",
 			},
 			{
-				SourceLabels: prometheusModel.LabelNames{"__param_target"},
-				TargetLabel:  "host",
+				TargetLabel: "job",
+				Replacement: "linux",
 			},
 		},
 	}
@@ -266,10 +266,14 @@ func (svc *Service) Add(
 			Region: string(models.RemoteNodeRegion),
 		}
 		if err := tx.Insert(node); err != nil {
-			if err, ok := err.(*mysql.MySQLError); ok && err.Number == 0x426 {
-				return status.Errorf(codes.AlreadyExists, "SNMP instance %q already exists.", node.Name)
+			if err, ok := err.(*mysql.MySQLError); !ok || err.Number != 0x426 {
+				return errors.WithStack(err)
 			}
-			return errors.WithStack(err)
+
+			err = tx.SelectOneTo(node, "WHERE type = ? AND name = ? AND region = ?", models.RemoteNodeType, name, string(models.RemoteNodeRegion))
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 		id = node.ID
 
