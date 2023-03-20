@@ -25,6 +25,7 @@ import (
 	snmpConfig "github.com/shatteredsilicon/snmp_exporter/config"
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
@@ -50,6 +51,7 @@ type ServiceConfig struct {
 	Supervisor    services.Supervisor
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
+	Consul        *consul.Client
 }
 
 // Service is responsible for interactions with SNMP.
@@ -253,12 +255,21 @@ func (svc *Service) Add(
 		return 0, status.Error(codes.InvalidArgument, "Unsupported SNMP version")
 	}
 
+	// check if instance is added on client side
+	added, err := svc.clientInstanceAdded(ctx, name)
+	if err != nil {
+		return 0, err
+	}
+	if added {
+		return 0, status.Error(codes.AlreadyExists, fmt.Sprintf("Linux instance with name %s is already added", name))
+	}
+
 	if port == 0 {
 		port = defaultSNMPPort
 	}
 
 	var id int32
-	err := svc.DB.InTransaction(func(tx *reform.TX) error {
+	err = svc.DB.InTransaction(func(tx *reform.TX) error {
 		// insert node
 		node := &models.RemoteNode{
 			Type:   models.RemoteNodeType,
@@ -400,4 +411,26 @@ func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 		return nil
 	})
 	return res, err
+}
+
+func (svc *Service) clientInstanceAdded(ctx context.Context, name string) (bool, error) {
+	node, err := svc.Consul.GetNode(name)
+	if err != nil {
+		logger.Get(ctx).Errorf("get consul services from node failed: %+v", err)
+		return false, err
+	}
+
+	if node == nil {
+		return false, nil
+	}
+
+	for _, service := range node.Services {
+		t := models.AgentType(service.Service)
+		if t == models.ClientNodeExporterAgentType {
+			// instance is added on client side
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
