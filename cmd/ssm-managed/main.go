@@ -207,7 +207,7 @@ func makeRDSService(ctx context.Context, deps *serviceDependencies) (*rds.Servic
 	return rdsService, nil
 }
 
-func makeSNMPService(ctx context.Context, deps *serviceDependencies) (*snmp.Service, error) {
+func makeSNMPService(ctx context.Context, deps *serviceDependencies, consul *consul.Client) (*snmp.Service, error) {
 	snmpConfig := snmp.ServiceConfig{
 		SNMPExporterPath:  *agentSNMPExporterF,
 		SNMPGeneratorPath: *snmpGeneratorF,
@@ -217,6 +217,7 @@ func makeSNMPService(ctx context.Context, deps *serviceDependencies) (*snmp.Serv
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
+		Consul:        consul,
 	}
 	snmpService, err := snmp.NewService(&snmpConfig)
 	if err != nil {
@@ -628,7 +629,7 @@ func main() {
 		l.Panicf("PostgreSQL service problem: %+v", err)
 	}
 
-	snmp, err := makeSNMPService(ctx, deps)
+	snmp, err := makeSNMPService(ctx, deps, consulClient)
 	if err != nil {
 		l.Panicf("SNMP service problem: %+v", err)
 	}
