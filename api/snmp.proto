@@ -24,11 +24,40 @@ message SNMPAddResponse {
     int32 id = 1;
 }
 
+message SNMPNode {
+    string name = 1;
+}
+
+message SNMPService {
+    string address = 1;
+    uint32 port = 2;
+    string engine = 3;
+    string engine_version = 4;
+}
+
+message SNMPInstance {
+    SNMPNode node = 1;
+    SNMPService service = 2;
+}
+
+message SNMPListRequest {
+}
+
+message SNMPListResponse {
+    repeated SNMPInstance instances = 1;
+}
+
 service SNMP {
     rpc Add(SNMPAddRequest) returns (SNMPAddResponse) {
         option (google.api.http) = {
             post: "/v0/snmp"
             body: "*"
+        };
+    }
+
+    rpc List(SNMPListRequest) returns (SNMPListResponse) {
+        option (google.api.http) = {
+            get: "/v0/snmp"
         };
     }
 }

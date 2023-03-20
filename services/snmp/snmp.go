@@ -358,3 +358,46 @@ func (svc *Service) generateSNMPConfig(
 	cmd := exec.Command(svc.SNMPGeneratorPath, "generate", "-i", svc.generatorConfigPath(name), "-o", svc.exporterConfigPath(name))
 	return cmd.Run()
 }
+
+// Instance snmp instance
+type Instance struct {
+	Node    models.RemoteNode
+	Service models.SNMPService
+}
+
+// List returns all snmp instances
+func (svc *Service) List(ctx context.Context) ([]Instance, error) {
+	var res []Instance
+	err := svc.DB.InTransaction(func(tx *reform.TX) error {
+		structs, e := tx.SelectAllFrom(models.RemoteNodeTable, "WHERE type = ? ORDER BY id", models.RemoteNodeType)
+		if e != nil {
+			return e
+		}
+		nodes := make([]models.RemoteNode, len(structs))
+		for i, str := range structs {
+			nodes[i] = *str.(*models.RemoteNode)
+		}
+
+		structs, e = tx.SelectAllFrom(models.SNMPServiceTable, "WHERE type = ? ORDER BY id", models.SNMPServiceType)
+		if e != nil {
+			return e
+		}
+		services := make([]models.SNMPService, len(structs))
+		for i, str := range structs {
+			services[i] = *str.(*models.SNMPService)
+		}
+
+		for _, node := range nodes {
+			for _, service := range services {
+				if node.ID == service.NodeID {
+					res = append(res, Instance{
+						Node:    node,
+						Service: service,
+					})
+				}
+			}
+		}
+		return nil
+	})
+	return res, err
+}

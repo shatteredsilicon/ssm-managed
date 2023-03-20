@@ -32,6 +32,31 @@ func (s *SNMPServer) Add(ctx context.Context, req *api.SNMPAddRequest) (*api.SNM
 	return &resp, nil
 }
 
+// List returns all SNMP instances
+func (s *SNMPServer) List(ctx context.Context, req *api.SNMPListRequest) (*api.SNMPListResponse, error) {
+	res, err := s.SNMP.List(ctx)
+	if err != nil {
+		logger.Get(ctx).Errorf("%+v", err)
+		return nil, err
+	}
+
+	var resp api.SNMPListResponse
+	for _, db := range res {
+		resp.Instances = append(resp.Instances, &api.SNMPInstance{
+			Node: &api.SNMPNode{
+				Name: db.Node.Name,
+			},
+			Service: &api.SNMPService{
+				Address:       *db.Service.Address,
+				Port:          uint32(*db.Service.Port),
+				Engine:        *db.Service.Engine,
+				EngineVersion: *db.Service.EngineVersion,
+			},
+		})
+	}
+	return &resp, nil
+}
+
 // check interfaces
 var (
 	_ api.SNMPServer = (*SNMPServer)(nil)
