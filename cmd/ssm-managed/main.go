@@ -618,7 +618,7 @@ func main() {
 		db:            db,
 		portsRegistry: portsRegistry,
 	}
-	rds, err := makeRDSService(ctx, deps)
+	rds, err := makeRDSService(ctx, deps, *pmmCompatible)
 	if err != nil {
 		l.Panicf("RDS service problem: %+v", err)
 	}
