@@ -75,6 +75,8 @@ type ServiceConfig struct {
 
 	RDSEnableGovCloud bool
 	RDSEnableCnCloud  bool
+
+	PMMCompatible bool
 }
 
 // Service is responsible for interactions with AWS RDS.
@@ -200,6 +202,15 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 			return err
 		}
 		for _, agent := range agents {
+			commonLabels := []prometheus.LabelPair{
+				{Name: "instance", Value: node.Name},
+			}
+			if svc.PMMCompatible {
+				commonLabels = append(commonLabels, prometheus.LabelPair{
+					Name: "aws_region", Value: node.Region,
+				})
+			}
+
 			switch agent.Type {
 			case models.MySQLdExporterAgentType:
 				a := models.MySQLdExporter{ID: agent.ID}
@@ -210,9 +221,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 
 				sc := prometheus.StaticConfig{
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
-					Labels: []prometheus.LabelPair{
-						{Name: "instance", Value: node.Name},
-					},
+					Labels:  commonLabels,
 				}
 				rdsMySQLHR.StaticConfigs = append(rdsMySQLHR.StaticConfigs, sc)
 				rdsMySQLMR.StaticConfigs = append(rdsMySQLMR.StaticConfigs, sc)
@@ -227,9 +236,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 
 				sc := prometheus.StaticConfig{
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
-					Labels: []prometheus.LabelPair{
-						{Name: "instance", Value: node.Name},
-					},
+					Labels:  commonLabels,
 				}
 				rdsBasic.StaticConfigs = append(rdsBasic.StaticConfigs, sc)
 				rdsEnhanced.StaticConfigs = append(rdsEnhanced.StaticConfigs, sc)
