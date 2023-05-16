@@ -169,7 +169,7 @@ func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor strin
 }
 
 // Restore ensures that agent is registered and running.
-func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent models.QanAgent) error {
+func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent models.QanAgent, collectFrom string) error {
 	l := logger.Get(ctx).WithField("component", "qan")
 
 	qanURL, err := getQanURL(ctx)
@@ -192,7 +192,7 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 	exampleQueries := true
 	config := config.QAN{
 		UUID:           dbInstance.UUID,
-		CollectFrom:    "perfschema",
+		CollectFrom:    collectFrom,
 		Interval:       60,
 		ExampleQueries: &exampleQueries,
 	}
@@ -324,12 +324,14 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgent) (
 			APIPath        string `json:"ApiPath"`
 			ServerUser     string `json:"ServerUser"`
 			ServerPassword string `json:"ServerPassword,omitempty"`
+			ManagedAPIPath string `json:"ManagedAPIPath"`
 		}{
 			agentInstance.UUID,
 			"127.0.0.1",
 			"/qan-api/",
 			serverUser,
 			os.Getenv("SERVER_PASSWORD"),
+			"managed",
 		}
 
 		// agentConf := fmt.Sprintf(`{"UUID":"%s","ApiHostname":"127.0.0.1","ApiPath":"/qan-api/","ServerUser":"pmm"}`, agentInstance.UUID)
@@ -348,7 +350,7 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgent) (
 	path = filepath.Join(svc.baseDir, "config", "log.conf")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err = ioutil.WriteFile(path, []byte(`{"Level":"info","Offline":"false"}`), 0666); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to write agent.conf")
+			return nil, nil, errors.Wrapf(err, "failed to write %s", path)
 		}
 
 		l.Infof("restored log config: %s.", path)
@@ -356,10 +358,19 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgent) (
 
 	path = filepath.Join(svc.baseDir, "config", fmt.Sprintf("qan-%s.conf", dbInstance.UUID))
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		qanConf := fmt.Sprintf(`{ "UUID": "%s", "CollectFrom": "perfschema", "Interval": 60, "ExampleQueries": true }`, dbInstance.UUID)
+		qanConf := fmt.Sprintf(`{ "UUID": "%s", "CollectFrom": "%s", "Interval": 60, "ExampleQueries": true }`, dbInstance.UUID, PerfschemaCollectFrom)
+
+		qanConfig, err := svc.getQANConfig(ctx, qanURL, dbInstance.UUID)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to get qan config from QAN API")
+		}
+		if qanConfig != nil {
+			confBytes, _ := json.Marshal(qanConfig)
+			qanConf = string(confBytes)
+		}
 
 		if err = ioutil.WriteFile(path, []byte(qanConf), 0666); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to write agent.conf")
+			return nil, nil, errors.Wrapf(err, "failed to write %s", path)
 		}
 
 		l.Infof("restored qan config: %s.", path)
@@ -810,4 +821,45 @@ JOIN (
 	}
 
 	return nodes, nil
+}
+
+// getQANConfig returns qan config from the QAN API.
+// Nil will be returned the qan config is not found
+func (svc *Service) getQANConfig(ctx context.Context, qanURL *url.URL, uuid string) (*config.RunningQAN, error) {
+	url := *qanURL
+	url.Path = path.Join(url.Path, "qan", "config", uuid)
+	req, err := http.NewRequest("GET", url.String(), nil)
+
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	rb, _ := httputil.DumpRequestOut(req, true)
+	logger.Get(ctx).WithField("component", "qan").Debugf("getQANConfig request:\n\n%s\n", rb)
+
+	resp, err := svc.qanAPI.Do(req)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer resp.Body.Close()
+
+	rb, _ = httputil.DumpResponse(resp, true)
+
+	if resp.StatusCode == 404 {
+		return nil, nil
+	}
+
+	if resp.StatusCode != 200 {
+		logger.Get(ctx).WithField("component", "qan").Errorf("getQANConfig response:\n\n%s\n", rb)
+		return nil, errors.Errorf("unexpected QAN response status code %d", resp.StatusCode)
+	}
+
+	logger.Get(ctx).WithField("component", "qan").Debugf("getQANConfig response:\n\n%s\n", rb)
+
+	var config config.RunningQAN
+	if err = json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &config, nil
 }
