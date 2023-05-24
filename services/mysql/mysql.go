@@ -172,6 +172,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
 					Labels: []prometheus.LabelPair{
 						{Name: "instance", Value: node.Name},
+						{Name: "region", Value: string(models.RemoteNodeRegion)},
 					},
 				}
 				mySQLHR.StaticConfigs = append(mySQLHR.StaticConfigs, sc)
