@@ -3,6 +3,7 @@ package prometheus
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"path"
 
@@ -11,7 +12,8 @@ import (
 )
 
 const (
-	targetsURI = "api/v1/targets"
+	targetsURI     = "api/v1/targets"
+	labelValuesURI = "api/v1/label/%s/values"
 )
 
 var scrapePoolServiceMap = map[string]models.AgentType{
@@ -121,4 +123,39 @@ func (svc *Service) GetNodeServices(ctx context.Context) ([]NodeService, error) 
 	}
 
 	return services, nil
+}
+
+// LabelValues response struct of prometheus' label values API
+type LabelValues struct {
+	Status string   `json:"status"`
+	Data   []string `json:"data"`
+}
+
+func (svc *Service) GetLabelValues(label string) (*LabelValues, error) {
+	u := *svc.baseURL
+	u.Path = path.Join(u.Path, fmt.Sprintf(labelValuesURI, label))
+	resp, err := svc.client.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, errors.Errorf("unexpected api %s returns: code: %d, data: %s", u.String(), resp.StatusCode, string(b))
+	}
+
+	var data LabelValues
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return nil, err
+	}
+	if data.Status != "success" {
+		return nil, errors.Errorf("unexpected api %s status: %s", u.String(), data.Status)
+	}
+
+	return &data, nil
 }

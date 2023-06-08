@@ -75,8 +75,6 @@ type ServiceConfig struct {
 
 	RDSEnableGovCloud bool
 	RDSEnableCnCloud  bool
-
-	PMMCompatible bool
 }
 
 // Service is responsible for interactions with AWS RDS.
@@ -180,6 +178,11 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		HonorLabels:    true,
 	}
 
+	awsRegionLabelValues, err := svc.Prometheus.GetLabelValues("aws_region")
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	nodes, err := q.FindAllFrom(models.RDSNodeTable, "type", models.RDSNodeType)
 	if err != nil {
 		return errors.WithStack(err)
@@ -205,7 +208,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 			commonLabels := []prometheus.LabelPair{
 				{Name: "instance", Value: node.Name},
 			}
-			if svc.PMMCompatible {
+			if len(awsRegionLabelValues.Data) > 0 {
 				commonLabels = append(commonLabels, prometheus.LabelPair{
 					Name: "aws_region", Value: node.Region,
 				})
