@@ -106,8 +106,6 @@ var (
 	rdsEnableGovCloud = flag.Bool("rds-enable-gov-cloud", false, "Enable GOV cloud for RDS")
 	rdsEnableCnCloud  = flag.Bool("rds-enable-cn-cloud", false, "Enable AWS CN cloud for RDS")
 
-	pmmCompatible = flag.Bool("pmm-compatible", false, "whether to be compatible with PMM")
-
 	debugF = flag.Bool("debug", false, "Enable debug logging")
 )
 
@@ -173,7 +171,7 @@ type serviceDependencies struct {
 	qan           *qan.Service
 }
 
-func makeRDSService(ctx context.Context, deps *serviceDependencies, pmmCompatible bool) (*rds.Service, error) {
+func makeRDSService(ctx context.Context, deps *serviceDependencies) (*rds.Service, error) {
 	rdsConfig := rds.ServiceConfig{
 		MySQLdExporterPath:    *agentMySQLdExporterF,
 		RDSExporterPath:       *agentRDSExporterF,
@@ -187,8 +185,6 @@ func makeRDSService(ctx context.Context, deps *serviceDependencies, pmmCompatibl
 
 		RDSEnableGovCloud: *rdsEnableGovCloud,
 		RDSEnableCnCloud:  *rdsEnableCnCloud,
-
-		PMMCompatible: pmmCompatible,
 	}
 	rdsService, err := rds.NewService(&rdsConfig)
 	if err != nil {
@@ -618,7 +614,7 @@ func main() {
 		db:            db,
 		portsRegistry: portsRegistry,
 	}
-	rds, err := makeRDSService(ctx, deps, *pmmCompatible)
+	rds, err := makeRDSService(ctx, deps)
 	if err != nil {
 		l.Panicf("RDS service problem: %+v", err)
 	}
