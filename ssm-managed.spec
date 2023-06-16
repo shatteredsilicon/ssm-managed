@@ -12,7 +12,7 @@
 
 Name:		%{repo}
 Version:	%{_version}
-Release:	1%{?dist}
+Release:	%{_release}
 Summary:	Shattered Silicon Monitoring and Management management daemon
 
 License:	AGPLv3
