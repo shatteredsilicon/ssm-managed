@@ -709,9 +709,18 @@ func (svc *Service) RemoveMySQL(ctx context.Context, qanAgent *models.QanAgent) 
 
 // RemoveClientQAN remove client-added qan
 func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID string) error {
-	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	qanURL, err := svc.StopClientQAN(ctx, agentID, instanceID)
 	if err != nil {
 		return err
+	}
+
+	return svc.removeInstanceFromServer(ctx, qanURL, instanceID)
+}
+
+func (svc *Service) StopClientQAN(ctx context.Context, agentID, instanceID string) (*url.URL, error) {
+	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	command := "StopTool"
@@ -721,7 +730,7 @@ func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID str
 		logger.Get(ctx).WithField("error", err).WithField("component", "qan").Errorf("sendQANCommand %s %s %s %s", agentID, instanceID, command, b)
 	}
 
-	return svc.removeInstanceFromServer(ctx, qanURL, instanceID)
+	return qanURL, nil
 }
 
 // RemoveQANData remove qan data

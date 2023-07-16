@@ -318,7 +318,7 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 			}
 		}
 
-		go svc.removeQANData(ctx, nodeID, node.InstanceUUID)
+		go svc.removeQANData(ctx, nodeID, node.InstanceUUID, agentUUID)
 	}
 
 	return nil
@@ -466,7 +466,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 					return err
 				}
 
-				go svc.removeQANData(ctx, nodeName, *a.QANDBInstanceUUID)
+				go svc.removeQANData(ctx, nodeName, *a.QANDBInstanceUUID, "")
 			}
 
 		case models.SNMPExporterAgentType:
@@ -594,7 +594,7 @@ func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error 
 			}
 		}
 
-		go svc.removeQANData(ctx, nodeID, node.InstanceUUID)
+		go svc.removeQANData(ctx, nodeID, node.InstanceUUID, agentUUID)
 	}
 
 	return nil
@@ -730,7 +730,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 						return err
 					}
 
-					go svc.removeQANData(ctx, nodeID, *a.QANDBInstanceUUID)
+					go svc.removeQANData(ctx, nodeID, *a.QANDBInstanceUUID, "")
 				}
 
 			case models.SNMPExporterAgentType:
@@ -911,7 +911,7 @@ func (svc *Service) genPrometheusQueries(nodeName string, service string) map[st
 	return queries
 }
 
-func (svc *Service) removeQANData(ctx context.Context, nodeID, instanceUUID string) {
+func (svc *Service) removeQANData(ctx context.Context, nodeID, instanceUUID, agentUUID string) {
 	deleteData := func() error {
 		nodes, err := svc.GetQanNodes(ctx, nodeID, false)
 		if err != nil {
@@ -924,6 +924,9 @@ func (svc *Service) removeQANData(ctx context.Context, nodeID, instanceUUID stri
 			}
 		}
 
+		if agentUUID != "" {
+			svc.qan.StopClientQAN(ctx, agentUUID, instanceUUID)
+		}
 		return svc.qan.RemoveQANData(ctx, instanceUUID)
 	}
 
