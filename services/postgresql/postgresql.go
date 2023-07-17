@@ -550,6 +550,7 @@ func (svc *Service) postgresExporterCfg(agent *models.PostgresExporter, dsn stri
 
 	arguments := []string{
 		fmt.Sprintf("-web.listen-address=127.0.0.1:%d", *agent.ListenPort),
+		"-web.auth-file=\"\"",
 	}
 	sort.Strings(arguments)
 
