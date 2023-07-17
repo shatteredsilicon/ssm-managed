@@ -301,6 +301,7 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 		"-collect.perf_schema.file_events",
 		"-collect.slave_status",
 		fmt.Sprintf("-web.listen-address=127.0.0.1:%d", *agent.ListenPort),
+		"-web.auth-file=\"\"",
 	}
 	if agent.MySQLDisableTablestats == nil || !*agent.MySQLDisableTablestats {
 		// enable tablestats and a few related collectors just like pmm-admin
