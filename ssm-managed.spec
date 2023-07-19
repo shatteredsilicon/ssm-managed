@@ -62,7 +62,7 @@ protoc -Iapi -Ivendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googlea
 
 mkdir -p %{_GOPATH}/src/%{provider}.%{provider_tld}/%{project}
 cp -r $(pwd) %{_GOPATH}/src/%{provider_prefix}
-go build -ldflags "${LDFLAGS:-} -s -w -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n') -X 'github.com/shatteredsilicon/ssm-managed/utils.Version=%{version}'" -a -v -x %{provider_prefix}/cmd/ssm-managed
+go build -ldflags "${LDFLAGS:-} -s -w -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n') -X 'github.com/shatteredsilicon/ssm-managed/utils.Version=%{version}-%{release}'" -a -v -x %{provider_prefix}/cmd/ssm-managed
 
 
 %install
