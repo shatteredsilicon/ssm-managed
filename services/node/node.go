@@ -301,7 +301,7 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		}
 
 		// not target
-		if node.OSName == string(models.PMMServerNodeType) || node.SubsystemID != subsystemID {
+		if node.OSName == string(models.SSMServerNodeType) || node.SubsystemID != subsystemID {
 			continue
 		}
 
@@ -577,7 +577,7 @@ func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error 
 			continue
 		}
 
-		if node.OSName == string(models.PMMServerNodeType) {
+		if node.OSName == string(models.SSMServerNodeType) {
 			continue
 		}
 

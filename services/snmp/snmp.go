@@ -76,7 +76,7 @@ func (svc *Service) exporterConfigPath(name string) string {
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
 	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.PMMServerNodeType)
+	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
 	if err != nil {
 		return nil, err
 	}

@@ -151,12 +151,12 @@ func (s *NodeServer) putConsulNodes(nodes []node.ClientNode, respNodes []*api.No
 
 func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.NodeInstance) []*api.NodeInstance {
 	for _, node := range nodes {
-		if node.Name == string(models.PMMServerNodeType) { // server itself
+		if node.Name == string(models.SSMServerNodeType) { // server itself
 			continue
 		}
 
 		var nis api.NodeInstanceService
-		if node.OSName == string(models.PMMServerNodeType) {
+		if node.OSName == string(models.SSMServerNodeType) {
 			nis.Region = string(models.RemoteNodeRegion)
 			nis.Type = string(models.QanAgentAgentType)
 		} else {
@@ -209,7 +209,7 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 
 func (s *NodeServer) putPrometheusNodes(nodes []prometheus.NodeService, respNodes []*api.NodeInstance) []*api.NodeInstance {
 	for _, node := range nodes {
-		if node.Name == string(models.PMMServerNodeType) { // server itself
+		if node.Name == string(models.SSMServerNodeType) { // server itself
 			continue
 		}
 

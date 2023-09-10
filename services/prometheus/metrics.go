@@ -96,7 +96,7 @@ func (svc *Service) GetNodeServices(ctx context.Context) ([]NodeService, error) 
 
 	services := make([]NodeService, 0)
 	for _, target := range data.Data.ActiveTargets {
-		if target.Labels.Instance == "" || target.Labels.Instance == string(models.PMMServerNodeType) {
+		if target.Labels.Instance == "" || target.Labels.Instance == string(models.SSMServerNodeType) {
 			continue
 		}
 

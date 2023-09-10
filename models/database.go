@@ -48,7 +48,7 @@ var databaseSchema = [][]string{
 			UNIQUE (type, name, region)
 		) AUTO_INCREMENT = 1`,
 
-		`INSERT INTO nodes (type, name) VALUES ('` + string(PMMServerNodeType) + `', 'SSM Server')`,
+		`INSERT INTO nodes (type, name) VALUES ('` + string(SSMServerNodeType) + `', 'SSM Server')`,
 
 		`CREATE TABLE services (
 			id INT NOT NULL AUTO_INCREMENT,
