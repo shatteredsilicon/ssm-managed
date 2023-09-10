@@ -68,7 +68,7 @@ type ServiceConfig struct {
 // Service is responsible for interactions with AWS RDS.
 type Service struct {
 	*ServiceConfig
-	pmmServerNode *models.Node
+	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
@@ -94,7 +94,7 @@ func NewService(config *ServiceConfig) (*Service, error) {
 
 	svc := &Service{
 		ServiceConfig: config,
-		pmmServerNode: &node,
+		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -239,7 +239,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 	}
 	agent := &models.MySQLdExporter{
 		Type:         models.MySQLdExporterAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -332,7 +332,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,

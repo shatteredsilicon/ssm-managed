@@ -81,7 +81,7 @@ type ServiceConfig struct {
 type Service struct {
 	*ServiceConfig
 	httpClient    *http.Client
-	pmmServerNode *models.Node
+	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
@@ -109,7 +109,7 @@ func NewService(config *ServiceConfig) (*Service, error) {
 	svc := &Service{
 		ServiceConfig: config,
 		httpClient:    new(http.Client),
-		pmmServerNode: &node,
+		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -458,7 +458,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 	}
 	agent := &models.MySQLdExporter{
 		Type:         models.MySQLdExporterAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -623,7 +623,7 @@ func (svc *Service) addRDSExporter(ctx context.Context, tx *reform.TX, service *
 	// insert rds_exporter agent and associations
 	agent := &models.RDSExporter{
 		Type:         models.RDSExporterAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ListenPort: pointer.ToUint16(rdsExporterPort),
 	}
@@ -664,7 +664,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
