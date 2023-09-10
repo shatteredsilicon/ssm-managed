@@ -27,6 +27,9 @@ const (
 	RemoteNodeType    NodeType = "remote"
 )
 
+// SSM server node name
+const SSMServerNodeName string = "SSM Server"
+
 // RegionType Type of region
 type RegionType string
 

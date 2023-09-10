@@ -49,12 +49,10 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
+	"github.com/shatteredsilicon/ssm/proto/config"
 )
 
 const (
-	qanAgentPort    uint16 = 9000
-	rdsExporterPort uint16 = 9042
-
 	// maximum time for AWS discover APIs calls
 	awsDiscoverTimeout = 7 * time.Second
 
@@ -625,7 +623,7 @@ func (svc *Service) addRDSExporter(ctx context.Context, tx *reform.TX, service *
 		Type:         models.RDSExporterAgentType,
 		RunsOnNodeID: svc.ssmServerNode.ID,
 
-		ListenPort: pointer.ToUint16(rdsExporterPort),
+		ListenPort: pointer.ToUint16(models.RDSExporterPort),
 	}
 	var err error
 	if err = tx.Insert(agent); err != nil {
@@ -668,7 +666,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
-		ListenPort:      pointer.ToUint16(qanAgentPort),
+		ListenPort:      pointer.ToUint16(models.QanAgentPort),
 	}
 	var err error
 	if err = tx.Insert(agent); err != nil {
@@ -683,7 +681,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
-		if err = svc.QAN.AddMySQL(ctx, node.Name, svc.MySQLServiceFromRDSService(service), agent, qan.RDSSlowlogCollectFrom); err != nil {
+		if err = svc.QAN.AddMySQL(ctx, node.Name, svc.MySQLServiceFromRDSService(service), agent, config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}); err != nil {
 			return err
 		}
 
