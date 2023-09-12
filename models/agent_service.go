@@ -34,7 +34,9 @@ type AgentService struct {
 // AgentServiceDetail AgentService with detail
 type AgentServiceDetail struct {
 	AgentService
-	NodeType string `reform:"node_type"`
+	NodeID            int32  `reform:"node_id"`
+	NodeType          string `reform:"node_type"`
+	QanDBInstanceUUID string `reform:"qan_db_instance_uuid"`
 }
 
 // AgentsForServiceID returns agents providing insights for given services.
@@ -65,16 +67,17 @@ func AgentsForServiceID(q *reform.Querier, serviceIDs ...interface{}) ([]Agent, 
 
 // AgentServiceByName returns agent_service
 func AgentServiceByName(q *reform.Querier, nodeName, agentType string) (*AgentServiceDetail, error) {
-	var agentID, serviceID int32
+	var agentID, serviceID, nodeID int32
 	var nodeType string
+	var qanDBInstanceUUID string
 	err := q.QueryRow(`
-SELECT agsv.agent_id, agsv.service_id, nodes.type
+SELECT agsv.agent_id, agsv.service_id, nodes.type AS node_type, nodes.id AS node_id, agents.qan_db_instance_uuid
 FROM agent_services agsv
 JOIN services ON agsv.service_id = services.id
 JOIN nodes ON services.node_id = nodes.id
 JOIN agents ON agsv.agent_id = agents.id
 WHERE nodes.name = ? and agents.type = ?
-`, nodeName, agentType).Scan(&agentID, &serviceID, &nodeType)
+`, nodeName, agentType).Scan(&agentID, &serviceID, &nodeType, &nodeID, &qanDBInstanceUUID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -87,6 +90,8 @@ WHERE nodes.name = ? and agents.type = ?
 			AgentID:   agentID,
 			ServiceID: serviceID,
 		},
-		NodeType: nodeType,
+		NodeID:            nodeID,
+		NodeType:          nodeType,
+		QanDBInstanceUUID: qanDBInstanceUUID,
 	}, nil
 }

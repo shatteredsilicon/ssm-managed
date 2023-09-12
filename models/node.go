@@ -22,10 +22,13 @@ type NodeType string
 
 // Node types
 const (
-	PMMServerNodeType NodeType = "ssm-server"
+	SSMServerNodeType NodeType = "ssm-server"
 	RDSNodeType       NodeType = "rds"
 	RemoteNodeType    NodeType = "remote"
 )
+
+// SSM server node name
+const SSMServerNodeName string = "SSM Server"
 
 // RegionType Type of region
 type RegionType string

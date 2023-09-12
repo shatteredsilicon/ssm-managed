@@ -42,10 +42,10 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
+	"github.com/shatteredsilicon/ssm/proto/config"
 )
 
 const (
-	qanAgentPort     uint16 = 9000
 	defaultMySQLPort uint32 = 3306
 
 	// maximum time for connecting to the database and running all queries
@@ -68,13 +68,13 @@ type ServiceConfig struct {
 // Service is responsible for interactions with AWS RDS.
 type Service struct {
 	*ServiceConfig
-	pmmServerNode *models.Node
+	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
 	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.PMMServerNodeType)
+	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func NewService(config *ServiceConfig) (*Service, error) {
 
 	svc := &Service{
 		ServiceConfig: config,
-		pmmServerNode: &node,
+		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -239,7 +239,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 	}
 	agent := &models.MySQLdExporter{
 		Type:         models.MySQLdExporterAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -332,11 +332,11 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
-		ListenPort:      pointer.ToUint16(qanAgentPort),
+		ListenPort:      pointer.ToUint16(models.QanAgentPort),
 	}
 	var err error
 	if err = tx.Insert(agent); err != nil {
@@ -351,7 +351,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
-		if err = svc.QAN.AddMySQL(ctx, node.Name, service, agent, qan.SlowlogCollectFrom); err != nil {
+		if err = svc.QAN.AddMySQL(ctx, node.Name, service, agent, config.QAN{CollectFrom: qan.SlowlogCollectFrom}); err != nil {
 			return err
 		}
 
@@ -663,10 +663,12 @@ func (svc *Service) EngineAndEngineVersion(ctx context.Context, host string, por
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
-	return normalizeEngineAndEngineVersion(versionComment, version)
+	return NormalizeEngineAndEngineVersion(versionComment, version)
 }
 
-func normalizeEngineAndEngineVersion(engine string, engineVersion string) (string, string, error) {
+// NormalizeEngineAndEngineVersion normalizes the output from
+// SQL 'SELECT @@version, @@version_comment'
+func NormalizeEngineAndEngineVersion(engine string, engineVersion string) (string, string, error) {
 	if versionRegexp.MatchString(engineVersion) {
 		submatch := versionRegexp.FindStringSubmatch(engineVersion)
 		engineVersion = submatch[1]

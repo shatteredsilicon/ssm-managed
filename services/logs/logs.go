@@ -185,7 +185,7 @@ func (l *Logs) Files(ctx context.Context) []File {
 	var agents []reform.Struct
 	err := l.db.InTransaction(func(tx *reform.TX) error {
 		var node models.Node
-		err := tx.FindOneTo(&node, "type", models.PMMServerNodeType)
+		err := tx.FindOneTo(&node, "type", models.SSMServerNodeType)
 		if err != nil {
 			return errors.Wrap(err, "failed to get PMM Server node")
 		}

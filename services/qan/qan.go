@@ -611,7 +611,7 @@ func (svc *Service) sendQANCommand(ctx context.Context, qanURL *url.URL, agentUU
 
 // AddMySQL adds MySQL instance to QAN, configuring and enabling it.
 // It sets MySQL instance UUID to qanAgent.QANDBInstanceUUID.
-func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService *models.MySQLService, qanAgent *models.QanAgent, collectFrom string) error {
+func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService *models.MySQLService, qanAgent *models.QanAgent, defaultConfig config.QAN) error {
 	qanURL, err := svc.ensureAgentIsRegistered(ctx)
 	if err != nil {
 		return err
@@ -633,6 +633,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 		Name:       nodeName,
 		DSN:        sanitizeDSN(qanAgent.DSN(mySQLService)),
 		Version:    *mySQLService.EngineVersion,
+		Deleted:    qanDeletedTimeZero,
 	}
 	if err = svc.addInstanceToServer(ctx, qanURL, instance); err != nil {
 		return err
@@ -661,9 +662,10 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	exampleQueries := true
 	config := config.QAN{
 		UUID:           instance.UUID,
-		CollectFrom:    collectFrom,
+		CollectFrom:    defaultConfig.CollectFrom,
 		Interval:       60,
 		ExampleQueries: &exampleQueries,
+		FilterAllow:    defaultConfig.FilterAllow,
 	}
 	if os.Getenv("QAN_FILTER_OMIT") != "" {
 		config.FilterOmit = strings.Split(os.Getenv("QAN_FILTER_OMIT"), ",")

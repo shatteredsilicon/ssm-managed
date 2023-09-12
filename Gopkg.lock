@@ -687,14 +687,15 @@
 
 [[projects]]
   branch = "1.x"
-  digest = "1:a480f885ffb34f9d5a2c761d127250c98d9357a8a77ce27c08dbb839d432c054"
+  digest = "1:21e2b12a2c82efcd9b6df143f83062782a961aaea1937250914392aea30b5c83"
   name = "github.com/shatteredsilicon/ssm"
   packages = [
     "proto",
     "proto/config",
+    "proto/query",
   ]
   pruneopts = "T"
-  revision = "b00aab5447e7f481eec150bc4fd6ba1137260b4f"
+  revision = "a48cc4fa2f0cb288abf0d6e5b9be08798c30ab9e"
 
 [[projects]]
   digest = "1:9fb5aea4972dbabf1b387366b1464e564b9d66fca5e6f1a931ea3e2661e61999"
@@ -1082,12 +1083,15 @@
     "github.com/cespare/xxhash",
     "github.com/go-sql-driver/mysql",
     "github.com/go-swagger/go-swagger/cmd/swagger",
+    "github.com/golang/protobuf/descriptor",
+    "github.com/golang/protobuf/proto",
     "github.com/golang/protobuf/protoc-gen-go",
     "github.com/google/uuid",
     "github.com/grpc-ecosystem/go-grpc-prometheus",
     "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway",
     "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger",
     "github.com/grpc-ecosystem/grpc-gateway/runtime",
+    "github.com/grpc-ecosystem/grpc-gateway/utilities",
     "github.com/hashicorp/consul/api",
     "github.com/lib/pq",
     "github.com/percona/kardianos-service",
@@ -1110,11 +1114,15 @@
     "github.com/vektra/mockery/cmd/mockery",
     "golang.org/x/net/context",
     "golang.org/x/sync/errgroup",
+    "google.golang.org/genproto/googleapis/api/annotations",
     "google.golang.org/genproto/googleapis/rpc/status",
     "google.golang.org/grpc",
     "google.golang.org/grpc/codes",
     "google.golang.org/grpc/grpclog",
+    "google.golang.org/grpc/metadata",
     "google.golang.org/grpc/status",
+    "google.golang.org/protobuf/reflect/protoreflect",
+    "google.golang.org/protobuf/runtime/protoimpl",
     "gopkg.in/reform.v1",
     "gopkg.in/reform.v1/dialects/mysql",
     "gopkg.in/reform.v1/parse",

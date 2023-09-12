@@ -18,8 +18,10 @@ package models
 
 import (
 	"fmt"
+	"io/fs"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
@@ -52,6 +54,9 @@ const (
 	ClientMongoDBQanAgentAgentType  AgentType = "mongodb:queries"
 	ClientPostgresExporterAgentType AgentType = "postgresql:metrics"
 	ClientProxySQLExporterAgentType AgentType = "proxysql:metrics"
+
+	QanAgentPort    uint16 = 9000
+	RDSExporterPort uint16 = 9042
 )
 
 // NameForSupervisor returns a name of agent for supervisor.
@@ -99,8 +104,9 @@ func (m *MySQLdExporter) DSN(service *MySQLService) string {
 
 // binary name is postgres_exporter, that's why PostgresExporter below is not PostgreSQLExporter
 
-//reform:agents
 // PostgresExporter exports PostgreSQL metrics.
+//
+//reform:agents
 type PostgresExporter struct {
 	ID           int32     `reform:"id,pk"`
 	Type         AgentType `reform:"type"`
@@ -176,6 +182,13 @@ func (q *QanAgent) DSN(service *MySQLService) string {
 	cfg.User = *q.ServiceUsername
 	cfg.Passwd = *q.ServicePassword
 
+	// internal QAN uses socket
+	if fileInfo, err := os.Stat(*service.Address); err == nil && fileInfo.Mode().Type() == fs.ModeSocket {
+		cfg.Addr = *service.Address
+		cfg.Net = "unix"
+		return cfg.FormatDSN()
+	}
+
 	cfg.Net = "tcp"
 	cfg.Addr = net.JoinHostPort(*service.Address, strconv.Itoa(int(*service.Port)))
 
@@ -186,8 +199,9 @@ func (q *QanAgent) DSN(service *MySQLService) string {
 	return cfg.FormatDSN()
 }
 
-//reform:agents
 // SNMPExporter exports SNMP metrics.
+//
+//reform:agents
 type SNMPExporter struct {
 	ID           int32     `reform:"id,pk"`
 	Type         AgentType `reform:"type"`

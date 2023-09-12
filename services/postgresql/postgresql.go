@@ -70,13 +70,13 @@ type ServiceConfig struct {
 // Service is responsible for interactions with PostgreSQL.
 type Service struct {
 	*ServiceConfig
-	pmmServerNode *models.Node
+	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
 	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.PMMServerNodeType)
+	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func NewService(config *ServiceConfig) (*Service, error) {
 
 	svc := &Service{
 		ServiceConfig: config,
-		pmmServerNode: &node,
+		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -447,7 +447,7 @@ func (svc *Service) addPostgresExporter(ctx context.Context, tx *reform.TX, serv
 	}
 	agent := &models.PostgresExporter{
 		Type:         models.PostgresExporterAgentType,
-		RunsOnNodeID: svc.pmmServerNode.ID,
+		RunsOnNodeID: svc.ssmServerNode.ID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
