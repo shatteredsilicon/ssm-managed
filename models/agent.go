@@ -17,6 +17,7 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 	"io/fs"
 	"net"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"gopkg.in/reform.v1"
 )
 
 //go:generate reform
@@ -227,4 +229,55 @@ func (p *SNMPExporter) DSN(service *SNMPService) string {
 		RawQuery: q.Encode(),
 	}
 	return uri.String()
+}
+
+// QanAgentsRunOnServer returns qan agents run on server
+func QanAgentsRunOnServer(q *reform.Querier) ([]QanAgent, error) {
+	rows, err := q.Query(`
+SELECT agents.id, agents.type, agents.runs_on_node_id, agents.service_username,
+	agents.service_password, agents.listen_port, agents.qan_db_instance_uuid
+FROM agents
+JOIN nodes ON agents.runs_on_node_id = nodes.id
+WHERE nodes.type = ? AND agents.type = ?
+`, SSMServerNodeType, QanAgentAgentType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	agents := make([]QanAgent, 0)
+	for rows.Next() {
+		var id, runsOnNodeID int32
+		var listenPort sql.NullInt16
+		var t AgentType
+		var serviceUsername, servicePassword, instanceUUID sql.NullString
+
+		err = rows.Scan(&id, &t, &runsOnNodeID, &serviceUsername, &servicePassword, &listenPort, &instanceUUID)
+		if err != nil {
+			return nil, err
+		}
+
+		agent := QanAgent{
+			ID:           id,
+			Type:         t,
+			RunsOnNodeID: runsOnNodeID,
+		}
+		if serviceUsername.Valid {
+			agent.ServiceUsername = &servicePassword.String
+		}
+		if servicePassword.Valid {
+			agent.ServicePassword = &servicePassword.String
+		}
+		if instanceUUID.Valid {
+			agent.QANDBInstanceUUID = &instanceUUID.String
+		}
+		if listenPort.Valid {
+			port := uint16(listenPort.Int16)
+			agent.ListenPort = &port
+		}
+
+		agents = append(agents, agent)
+	}
+
+	return agents, nil
 }
