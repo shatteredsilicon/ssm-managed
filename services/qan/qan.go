@@ -44,6 +44,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
+	"gopkg.in/reform.v1"
 )
 
 const (
@@ -208,6 +209,27 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 	l.Infof("%s %s %s", agentInstance.UUID, command, b)
 
 	return svc.sendQANCommand(ctx, qanURL, agentInstance.UUID, command, b)
+}
+
+// RestoreConfigs restore all configs from QAN API
+func (svc *Service) RestoreConfigs(ctx context.Context, q *reform.Querier) error {
+	l := logger.Get(ctx).WithField("component", "qan")
+
+	agents, err := models.QanAgentsRunOnServer(q)
+	if err != nil {
+		l.Errorf("get qan agents from db failed: %+v", err)
+		return err
+	}
+
+	for _, agent := range agents {
+		_, _, err = svc.restoreConfigs(ctx, agent)
+		if err != nil {
+			l.Errorf("restore qan config for %d failed: %+v", agent.ID, err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgent) (*proto.Instance, *proto.Instance, error) {

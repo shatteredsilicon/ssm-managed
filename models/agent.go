@@ -17,6 +17,7 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 	"net"
 	"net/url"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"gopkg.in/reform.v1"
 )
 
 //go:generate reform
@@ -99,8 +101,9 @@ func (m *MySQLdExporter) DSN(service *MySQLService) string {
 
 // binary name is postgres_exporter, that's why PostgresExporter below is not PostgreSQLExporter
 
-//reform:agents
 // PostgresExporter exports PostgreSQL metrics.
+//
+//reform:agents
 type PostgresExporter struct {
 	ID           int32     `reform:"id,pk"`
 	Type         AgentType `reform:"type"`
@@ -186,8 +189,9 @@ func (q *QanAgent) DSN(service *MySQLService) string {
 	return cfg.FormatDSN()
 }
 
-//reform:agents
 // SNMPExporter exports SNMP metrics.
+//
+//reform:agents
 type SNMPExporter struct {
 	ID           int32     `reform:"id,pk"`
 	Type         AgentType `reform:"type"`
@@ -213,4 +217,55 @@ func (p *SNMPExporter) DSN(service *SNMPService) string {
 		RawQuery: q.Encode(),
 	}
 	return uri.String()
+}
+
+// QanAgentsRunOnServer returns qan agents run on server
+func QanAgentsRunOnServer(q *reform.Querier) ([]QanAgent, error) {
+	rows, err := q.Query(`
+SELECT agents.id, agents.type, agents.runs_on_node_id, agents.service_username,
+	agents.service_password, agents.listen_port, agents.qan_db_instance_uuid
+FROM agents
+JOIN nodes ON agents.runs_on_node_id = nodes.id
+WHERE nodes.type = ? AND agents.type = ?
+`, PMMServerNodeType, QanAgentAgentType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	agents := make([]QanAgent, 0)
+	for rows.Next() {
+		var id, runsOnNodeID int32
+		var listenPort sql.NullInt16
+		var t AgentType
+		var serviceUsername, servicePassword, instanceUUID sql.NullString
+
+		err = rows.Scan(&id, &t, &runsOnNodeID, &serviceUsername, &servicePassword, &listenPort, &instanceUUID)
+		if err != nil {
+			return nil, err
+		}
+
+		agent := QanAgent{
+			ID:           id,
+			Type:         t,
+			RunsOnNodeID: runsOnNodeID,
+		}
+		if serviceUsername.Valid {
+			agent.ServiceUsername = &servicePassword.String
+		}
+		if servicePassword.Valid {
+			agent.ServicePassword = &servicePassword.String
+		}
+		if instanceUUID.Valid {
+			agent.QANDBInstanceUUID = &instanceUUID.String
+		}
+		if listenPort.Valid {
+			port := uint16(listenPort.Int16)
+			agent.ListenPort = &port
+		}
+
+		agents = append(agents, agent)
+	}
+
+	return agents, nil
 }
