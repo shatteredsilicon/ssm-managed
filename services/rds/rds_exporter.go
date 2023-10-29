@@ -46,6 +46,6 @@ func (config *rdsExporterConfig) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "can't marshal rds_exporter configuration file")
 	}
-	b = append([]byte("# Managed by pmm-managed. DO NOT EDIT.\n---\n"), b...)
+	b = append([]byte("# Managed by ssm-managed. DO NOT EDIT.\n---\n"), b...)
 	return b, nil
 }

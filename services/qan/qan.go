@@ -748,6 +748,36 @@ func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID str
 	return svc.removeInstanceFromServer(ctx, qanURL, instanceID)
 }
 
+func (svc *Service) RemoveQANDataWrapper(ctx context.Context, nodeID, instanceUUID string) {
+	deleteData := func() error {
+		nodes, err := svc.GetUnremovedNodes(ctx, nodeID, false)
+		if err != nil {
+			return err
+		}
+
+		for _, node := range nodes {
+			if node.InstanceUUID == instanceUUID { // qan node re-added
+				return nil
+			}
+		}
+
+		return svc.RemoveQANData(ctx, instanceUUID)
+	}
+
+	deleteData()
+
+	// continually remove qan data incase there are some ongoing qan task
+	retryTimes := 30
+	for i := 0; i < retryTimes; i++ {
+		<-time.NewTimer(5 * time.Second).C
+
+		err := deleteData()
+		if err != nil {
+			logger.Get(ctx).WithField("component", "qan").Errorf("remove qan data for %s-%s failed: %+v", nodeID, instanceUUID, err)
+		}
+	}
+}
+
 // RemoveQANData remove qan data
 func (svc *Service) RemoveQANData(ctx context.Context, instanceID string) error {
 	qanURL, err := svc.ensureAgentIsRegistered(ctx)

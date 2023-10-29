@@ -47,6 +47,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
 	"github.com/shatteredsilicon/ssm/proto/config"
@@ -542,7 +543,7 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 	}
 }
 
-func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX, agentRequired bool) (*rdsExporterConfig, error) {
+func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX, excludeNodes ...string) (*rdsExporterConfig, error) {
 	// collect all RDS nodes
 	var config rdsExporterConfig
 	nodes, err := tx.FindAllFrom(models.RDSNodeTable, "type", models.RDSNodeType)
@@ -552,15 +553,8 @@ func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX, agentRequired bool) (
 	for _, n := range nodes {
 		node := n.(*models.RDSNode)
 
-		if agentRequired {
-			var agent models.Agent
-			err = tx.SelectOneTo(&agent, "WHERE runs_on_node_id = ? AND type = ?", node.ID, models.RDSExporterAgentType)
-			if err != nil && err != sql.ErrNoRows {
-				return nil, errors.WithStack(err)
-			}
-			if err == sql.ErrNoRows {
-				continue
-			}
+		if excludeNodes != nil && utils.SliceContains(excludeNodes, node.Name) {
+			continue
 		}
 
 		var service models.RDSService
@@ -638,7 +632,7 @@ func (svc *Service) addRDSExporter(ctx context.Context, tx *reform.TX, service *
 
 	if svc.RDSExporterPath != "" {
 		// update rds_exporter configuration
-		if _, err = svc.UpdateRDSExporterConfig(tx, false); err != nil {
+		if _, err = svc.UpdateRDSExporterConfig(tx); err != nil {
 			return err
 		}
 
@@ -870,9 +864,16 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
+
+				// remove agent
+				err = tx.Delete(&agent)
+				if err != nil && err != sql.ErrNoRows {
+					return errors.WithStack(err)
+				}
+
 				if svc.RDSExporterPath != "" {
 					// update rds_exporter configuration
-					config, err := svc.UpdateRDSExporterConfig(tx, false)
+					config, err := svc.UpdateRDSExporterConfig(tx, id.Name)
 					if err != nil {
 						return err
 					}
@@ -895,16 +896,18 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 					return errors.WithStack(err)
 				}
 				if svc.QAN != nil {
+					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
 					if err = svc.QAN.RemoveMySQL(ctx, &a); err != nil {
 						return err
 					}
+					go svc.QAN.RemoveQANDataWrapper(ctx, id.Name, *a.QANDBInstanceUUID)
 				}
 			}
 		}
 
 		// remove agents
 		for _, agent := range agents {
-			if err = tx.Delete(&agent); err != nil {
+			if err = tx.Delete(&agent); err != nil && err != sql.ErrNoRows {
 				return errors.WithStack(err)
 			}
 		}
@@ -916,7 +919,26 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 			return errors.WithStack(err)
 		}
 
-		return svc.ApplyPrometheusConfiguration(ctx, tx.Querier)
+		err = svc.ApplyPrometheusConfiguration(ctx, tx.Querier)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// remove prometheus data
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logrus.WithField("component", "rds").Errorf("delete metrics data for %s failed: %+v", id.Name, r)
+				}
+			}()
+
+			err := svc.Prometheus.RemoveNode(ctx, id.Name)
+			if err != nil {
+				logrus.WithField("component", "rds").Errorf("delete metrics data for %s failed: %+v", id.Name, err)
+			}
+		}()
+
+		return nil
 	})
 }
 
@@ -968,7 +990,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					return errors.WithStack(err)
 				}
 				if svc.RDSExporterPath != "" {
-					config, err := svc.UpdateRDSExporterConfig(tx, false)
+					config, err := svc.UpdateRDSExporterConfig(tx)
 					if err != nil {
 						return err
 					}

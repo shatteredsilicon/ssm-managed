@@ -115,10 +115,10 @@ func (svc *Service) saveConfigAndReload(ctx context.Context, cfg *config.Config)
 	if err != nil {
 		return errors.Wrap(err, "can't marshal Prometheus configuration file")
 	}
-	new = append([]byte("# Managed by pmm-managed. DO NOT EDIT.\n---\n"), new...)
+	new = append([]byte("# Managed by ssm-managed. DO NOT EDIT.\n---\n"), new...)
 
 	// write new content to temporary file, check it
-	f, err := ioutil.TempFile("", "pmm-managed-config-")
+	f, err := ioutil.TempFile("", "ssm-managed-config-")
 	if err != nil {
 		return errors.WithStack(err)
 	}

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -158,4 +160,54 @@ func (svc *Service) GetLabelValues(label string) (*LabelValues, error) {
 	}
 
 	return &data, nil
+}
+
+func (svc *Service) RemoveNode(ctx context.Context, nodeID string) error {
+	deleteSeries := func(ctx context.Context, nodeName string) error {
+		activeTargets, err := svc.GetNodeServices(ctx)
+		if err != nil {
+			return fmt.Errorf("get active targets from prometheus for %s failed: %s", nodeName, err.Error())
+		}
+
+		for _, target := range activeTargets {
+			if string(target.Name) == nodeName { // service has been re-added
+				return nil
+			}
+		}
+
+		err = svc.DeleteSeries(map[string]string{
+			"instance=": nodeName,
+		})
+		if err != nil {
+			return fmt.Errorf("delete metrics data for %s failed: %s", nodeName, err.Error())
+		}
+
+		return nil
+	}
+
+	deleteSeries(ctx, nodeID)
+
+	// continually remove prometheus data incase there are some ongoing metrics task
+	retryTimes := 35
+	for i := 0; i < retryTimes; i++ {
+		if retryTimes < 30 {
+			<-time.NewTimer(1 * time.Second).C // for second-level jobs
+		} else {
+			<-time.NewTimer(1 * time.Minute).C // for minute-level jobs
+		}
+
+		err := deleteSeries(ctx, nodeID)
+		if err != nil {
+			logrus.Errorf("delete metrics data for %s failed: %s, try %d", nodeID, err.Error(), i+1)
+			continue
+		}
+
+		err = svc.CleanTombstones(context.Background())
+		if err != nil {
+			logrus.Errorf("clean tombstones for %s failed: %s, try %d", nodeID, err.Error(), i+1)
+			continue
+		}
+	}
+
+	return fmt.Errorf("delete metrics data for %s failed, tried %d times", nodeID, retryTimes)
 }
