@@ -22,10 +22,6 @@ import (
 	"gopkg.in/reform.v1"
 )
 
-const (
-	removedInstanceConsulKey = "client/removed-instances"
-)
-
 // Service client service
 type Service struct {
 	consul     *consul.Client
@@ -107,7 +103,7 @@ func (svc *Service) RemoveNode(ctx context.Context, nodeID string) error {
 			}
 		}()
 
-		err := svc.removeNodeFromPrometheus(ctx, nodeID)
+		err := svc.prometheus.RemoveNode(ctx, nodeID)
 		if err != nil {
 			logrus.Errorf("delete metrics data for %s failed: %+v", nodeID, err)
 		}
@@ -216,9 +212,9 @@ func (svc *Service) removeServiceFromPrometheus(ctx context.Context, nodeName, s
 	retryTimes := 35
 	for i := 0; i < retryTimes; i++ {
 		if i < 30 {
-			<-time.Tick(1 * time.Second) // for second-level jobs
+			<-time.NewTimer(1 * time.Second).C // for second-level jobs
 		} else {
-			<-time.Tick(1 * time.Minute) // for minute-level jobs
+			<-time.NewTimer(1 * time.Minute).C // for minute-level jobs
 		}
 
 		err := deleteSeries(ctx, nodeName, service)
@@ -291,7 +287,7 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		return err
 	}
 
-	if qanNodes == nil || len(qanNodes) == 0 {
+	if len(qanNodes) == 0 {
 		return nil
 	}
 
@@ -318,7 +314,7 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 			}
 		}
 
-		go svc.removeQANData(ctx, nodeID, node.InstanceUUID)
+		go svc.qan.RemoveQANDataWrapper(ctx, nodeID, node.InstanceUUID)
 	}
 
 	return nil
@@ -438,7 +434,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 
 			if svc.rds.RDSExporterPath != "" {
 				// update rds_exporter configuration
-				config, err := svc.rds.UpdateRDSExporterConfig(tx, true)
+				config, err := svc.rds.UpdateRDSExporterConfig(tx, nodeName)
 				if err != nil {
 					return err
 				}
@@ -461,12 +457,12 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.qan != nil {
-				<-time.Tick(1 * time.Second) // delay a little bit to avoid duplicate record in qan database
+				<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
 				if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 					return err
 				}
 
-				go svc.removeQANData(ctx, nodeName, *a.QANDBInstanceUUID)
+				go svc.qan.RemoveQANDataWrapper(ctx, nodeName, *a.QANDBInstanceUUID)
 			}
 
 		case models.SNMPExporterAgentType:
@@ -512,63 +508,13 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 	})
 }
 
-func (svc *Service) removeNodeFromPrometheus(ctx context.Context, nodeID string) error {
-	deleteSeries := func(ctx context.Context, nodeName string) error {
-		activeTargets, err := svc.prometheus.GetNodeServices(ctx)
-		if err != nil {
-			return fmt.Errorf("get active targets from prometheus for %s failed: %s", nodeName, err.Error())
-		}
-
-		for _, target := range activeTargets {
-			if string(target.Name) == nodeName { // service has been re-added
-				return nil
-			}
-		}
-
-		err = svc.prometheus.DeleteSeries(map[string]string{
-			"instance=": nodeName,
-		})
-		if err != nil {
-			return fmt.Errorf("delete metrics data for %s failed: %s", nodeName, err.Error())
-		}
-
-		return nil
-	}
-
-	deleteSeries(ctx, nodeID)
-
-	// continually remove prometheus data incase there are some ongoing metrics task
-	retryTimes := 35
-	for i := 0; i < retryTimes; i++ {
-		if retryTimes < 30 {
-			<-time.Tick(1 * time.Second) // for second-level jobs
-		} else {
-			<-time.Tick(1 * time.Minute) // for minute-level jobs
-		}
-
-		err := deleteSeries(ctx, nodeID)
-		if err != nil {
-			logrus.Errorf("delete metrics data for %s failed: %s, try %d", nodeID, err.Error(), i+1)
-			continue
-		}
-
-		err = svc.prometheus.CleanTombstones(context.Background())
-		if err != nil {
-			logrus.Errorf("clean tombstones for %s failed: %s, try %d", nodeID, err.Error(), i+1)
-			continue
-		}
-	}
-
-	return fmt.Errorf("delete metrics data for %s failed, tried %d times", nodeID, retryTimes)
-}
-
 func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error {
 	qanNodes, err := svc.GetQanNodes(ctx, nodeID, true)
 	if err != nil {
 		return err
 	}
 
-	if qanNodes == nil || len(qanNodes) == 0 {
+	if len(qanNodes) == 0 {
 		return nil
 	}
 
@@ -594,7 +540,7 @@ func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error 
 			}
 		}
 
-		go svc.removeQANData(ctx, nodeID, node.InstanceUUID)
+		go svc.qan.RemoveQANDataWrapper(ctx, nodeID, node.InstanceUUID)
 	}
 
 	return nil
@@ -702,7 +648,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 				}
 				if svc.rds.RDSExporterPath != "" {
 					// update rds_exporter configuration
-					config, err := svc.rds.UpdateRDSExporterConfig(tx, false)
+					config, err := svc.rds.UpdateRDSExporterConfig(tx, nodeID)
 					if err != nil {
 						return err
 					}
@@ -725,12 +671,12 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 					return errors.WithStack(err)
 				}
 				if svc.qan != nil {
-					<-time.Tick(1 * time.Second) // delay a little bit to avoid duplicate record in qan database
+					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
 					if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 						return err
 					}
 
-					go svc.removeQANData(ctx, nodeID, *a.QANDBInstanceUUID)
+					go svc.qan.RemoveQANDataWrapper(ctx, nodeID, *a.QANDBInstanceUUID)
 				}
 
 			case models.SNMPExporterAgentType:
@@ -909,33 +855,4 @@ func (svc *Service) genPrometheusQueries(nodeName string, service string) map[st
 	}
 
 	return queries
-}
-
-func (svc *Service) removeQANData(ctx context.Context, nodeID, instanceUUID string) {
-	deleteData := func() error {
-		nodes, err := svc.GetQanNodes(ctx, nodeID, false)
-		if err != nil {
-			return err
-		}
-
-		for _, node := range nodes {
-			if node.InstanceUUID == instanceUUID { // qan node re-added
-				return nil
-			}
-		}
-
-		return svc.qan.RemoveQANData(ctx, instanceUUID)
-	}
-
-	deleteData()
-	// continually remove qan data incase there are some ongoing qan task
-	retryTimes := 30
-	for i := 0; i < retryTimes; i++ {
-		<-time.Tick(5 * time.Second)
-
-		err := deleteData()
-		if err != nil {
-			logrus.Errorf("remove qan data for %s-%s failed: %+v", nodeID, instanceUUID, err)
-		}
-	}
 }

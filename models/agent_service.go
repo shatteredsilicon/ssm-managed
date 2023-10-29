@@ -69,7 +69,7 @@ func AgentsForServiceID(q *reform.Querier, serviceIDs ...interface{}) ([]Agent, 
 func AgentServiceByName(q *reform.Querier, nodeName, agentType string) (*AgentServiceDetail, error) {
 	var agentID, serviceID, nodeID int32
 	var nodeType string
-	var qanDBInstanceUUID string
+	var qanDBInstanceUUID sql.NullString
 	err := q.QueryRow(`
 SELECT agsv.agent_id, agsv.service_id, nodes.type AS node_type, nodes.id AS node_id, agents.qan_db_instance_uuid
 FROM agent_services agsv
@@ -85,13 +85,17 @@ WHERE nodes.name = ? and agents.type = ?
 		return nil, err
 	}
 
-	return &AgentServiceDetail{
+	agentService := &AgentServiceDetail{
 		AgentService: AgentService{
 			AgentID:   agentID,
 			ServiceID: serviceID,
 		},
-		NodeID:            nodeID,
-		NodeType:          nodeType,
-		QanDBInstanceUUID: qanDBInstanceUUID,
-	}, nil
+		NodeID:   nodeID,
+		NodeType: nodeType,
+	}
+	if qanDBInstanceUUID.Valid {
+		agentService.QanDBInstanceUUID = qanDBInstanceUUID.String
+	}
+
+	return agentService, nil
 }
