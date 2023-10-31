@@ -67,3 +67,8 @@ ignored = [
 [[override]]
   name = "github.com/shatteredsilicon/snmp_exporter"
   branch = "ssm-1.x"
+
+[[constraint]]
+  name = "github.com/go-sql-driver/mysql"
+  source = "github.com/shatteredsilicon/go-sql-driver-mysql"
+  version = "v1.7.1.1"
