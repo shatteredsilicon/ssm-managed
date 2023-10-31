@@ -242,12 +242,13 @@
   version = "v0.22.0"
 
 [[projects]]
-  digest = "1:a51f83b872149289260897102f7364bc412f19c119295252d3d0bda439b23d98"
+  digest = "1:b3b0382dac669223e8e0e34a8e1c3a2887f7ca55b006a939fe3e590aa8c55742"
   name = "github.com/go-sql-driver/mysql"
   packages = ["."]
   pruneopts = "T"
-  revision = "bcc459a906419e2890a50fc2c99ea6dd927a88f2"
-  version = "v1.6.0"
+  revision = "ca087917bf671fa6e157dab676ef399d663c841e"
+  source = "github.com/shatteredsilicon/go-sql-driver-mysql"
+  version = "v1.7.1.1"
 
 [[projects]]
   digest = "1:99152b4a4ec10a84e237420d278dcd04d5eb887251988951dff12a82499f3a2e"
