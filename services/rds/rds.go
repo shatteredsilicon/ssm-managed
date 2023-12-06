@@ -900,7 +900,6 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 					if err = svc.QAN.RemoveMySQL(ctx, &a); err != nil {
 						return err
 					}
-					go svc.QAN.RemoveQANDataWrapper(ctx, id.Name, *a.QANDBInstanceUUID)
 				}
 			}
 		}
