@@ -17,6 +17,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/rds"
 	"github.com/shatteredsilicon/ssm-managed/services/snmp"
+	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/reform.v1"
@@ -167,6 +168,21 @@ func (svc *Service) RemoveService(ctx context.Context, nodeID string, id uint32,
 }
 
 func (svc *Service) removeServiceFromPrometheus(ctx context.Context, nodeName, service string) error {
+	if !utils.SliceContains([]models.AgentType{
+		models.NodeExporterAgentType,
+		models.RDSExporterAgentType,
+		models.MySQLdExporterAgentType,
+		models.MongoDBExporterAgentType,
+		models.PostgresExporterAgentType,
+		models.ClientNodeExporterAgentType,
+		models.ClientMySQLQanAgentAgentType,
+		models.ClientMongoDBExporterAgentType,
+		models.ClientPostgresExporterAgentType,
+		models.ClientProxySQLExporterAgentType,
+	}, models.AgentType(service)) {
+		return nil
+	}
+
 	deleteSeries := func(ctx context.Context, nodeName, service string) error {
 		activeTargets, err := svc.prometheus.GetNodeServices(ctx)
 		if err != nil {
@@ -267,11 +283,15 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 	var subsystemID int
 
 	// server-side qan agent
-	if service == string(models.MySQLdExporterAgentType) || service == string(models.MongoDBExporterAgentType) {
+	if !utils.SliceContains([]models.AgentType{
+		models.QanAgentAgentType,
+		models.ClientMySQLQanAgentAgentType,
+		models.ClientMongoDBQanAgentAgentType,
+	}, models.AgentType(service)) {
 		return nil
 	}
 
-	if service == string(models.ClientMySQLQanAgentAgentType) {
+	if service == string(models.ClientMySQLQanAgentAgentType) || service == string(models.QanAgentAgentType) {
 		subsystemID = qan.SubsystemMySQL
 	} else if service == string(models.ClientMongoDBQanAgentAgentType) {
 		subsystemID = qan.SubsystemMongo
@@ -297,7 +317,7 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		}
 
 		// not target
-		if node.OSName == string(models.SSMServerNodeType) || node.SubsystemID != subsystemID {
+		if node.SubsystemID != subsystemID {
 			continue
 		}
 
@@ -307,14 +327,12 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 			return err
 		}
 
-		if err == nil {
+		if agentUUID != "" {
 			err = svc.qan.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
 			if err != nil {
 				return err
 			}
 		}
-
-		go svc.qan.RemoveQANDataWrapper(ctx, nodeID, node.InstanceUUID)
 	}
 
 	return nil
@@ -461,8 +479,6 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 					return err
 				}
-
-				go svc.qan.RemoveQANDataWrapper(ctx, nodeName, *a.QANDBInstanceUUID)
 			}
 
 		case models.SNMPExporterAgentType:
@@ -539,8 +555,6 @@ func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error 
 				return err
 			}
 		}
-
-		go svc.qan.RemoveQANDataWrapper(ctx, nodeID, node.InstanceUUID)
 	}
 
 	return nil
@@ -675,8 +689,6 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 					if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
 						return err
 					}
-
-					go svc.qan.RemoveQANDataWrapper(ctx, nodeID, *a.QANDBInstanceUUID)
 				}
 
 			case models.SNMPExporterAgentType:

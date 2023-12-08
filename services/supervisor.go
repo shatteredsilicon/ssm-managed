@@ -28,7 +28,7 @@ var (
 	ErrNoSuchFileOrDir = errors.New("no such file or directory")
 )
 
-//go:generate mockery -name=Supervisor -case=snake
+//go:generate mockery --name Supervisor --case snake
 
 // Supervisor is an interface for supervisor.Supervisor for mock generation.
 type Supervisor interface {

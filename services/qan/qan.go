@@ -738,6 +738,10 @@ func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID str
 		return err
 	}
 
+	if err = svc.removeInstanceFromServer(ctx, qanURL, instanceID); err != nil {
+		return err
+	}
+
 	command := "StopTool"
 	b := []byte(instanceID)
 
@@ -745,37 +749,7 @@ func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID str
 		logger.Get(ctx).WithField("error", err).WithField("component", "qan").Errorf("sendQANCommand %s %s %s %s", agentID, instanceID, command, b)
 	}
 
-	return svc.removeInstanceFromServer(ctx, qanURL, instanceID)
-}
-
-func (svc *Service) RemoveQANDataWrapper(ctx context.Context, nodeID, instanceUUID string) {
-	deleteData := func() error {
-		nodes, err := svc.GetUnremovedNodes(ctx, nodeID, false)
-		if err != nil {
-			return err
-		}
-
-		for _, node := range nodes {
-			if node.InstanceUUID == instanceUUID { // qan node re-added
-				return nil
-			}
-		}
-
-		return svc.RemoveQANData(ctx, instanceUUID)
-	}
-
-	deleteData()
-
-	// continually remove qan data incase there are some ongoing qan task
-	retryTimes := 30
-	for i := 0; i < retryTimes; i++ {
-		<-time.NewTimer(5 * time.Second).C
-
-		err := deleteData()
-		if err != nil {
-			logger.Get(ctx).WithField("component", "qan").Errorf("remove qan data for %s-%s failed: %+v", nodeID, instanceUUID, err)
-		}
-	}
+	return nil
 }
 
 // RemoveQANData remove qan data
@@ -789,15 +763,40 @@ func (svc *Service) RemoveQANData(ctx context.Context, instanceID string) error 
 }
 
 // GetAgentUUIDFromDB get unremoved agent uuid from QAN database
-func (svc *Service) GetAgentUUIDFromDB(ctx context.Context, clientName string, subsystem int) (uuid string, err error) {
-	err = svc.db.QueryRow(`
-SELECT ins1.uuid
+func (svc *Service) GetAgentUUIDFromDB(ctx context.Context, clientName string, subsystem int) (string, error) {
+	rows, err := svc.db.Query(`
+SELECT ins1.created, ins1.deleted, ins2.uuid
 FROM instances ins1
 JOIN instances ins2 ON ins1.parent_uuid = ins2.parent_uuid
-WHERE ins1.subsystem_id = ? AND ins2.name = ? AND ins2.subsystem_id = ? AND (ins2.deleted IS NULL OR ins2.deleted = ?)
-`, SubsystemAgent, clientName, subsystem, qanDeletedTimeZero).Scan(&uuid)
+WHERE ins2.subsystem_id = ? AND ins1.name = ? AND ins1.subsystem_id = ?
+`, SubsystemAgent, clientName, subsystem)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
 
-	return
+	var lastestCreated time.Time
+	var lastestAgentUUID string
+	for rows.Next() {
+		var createdAt time.Time
+		var deletedAt sql.NullTime
+		var agentUUID string
+		err = rows.Scan(&createdAt, &deletedAt, &agentUUID)
+		if err != nil {
+			return "", err
+		}
+
+		if !deletedAt.Valid || deletedAt.Time.IsZero() || deletedAt.Time.Equal(qanDeletedTimeZero) {
+			return agentUUID, nil
+		}
+
+		if createdAt.After(lastestCreated) {
+			lastestCreated = createdAt
+			lastestAgentUUID = agentUUID
+		}
+	}
+
+	return lastestAgentUUID, nil
 }
 
 // UnremovedNode unremoved node structure

@@ -3,6 +3,7 @@
 %global _dwz_low_mem_die_limit 0
 
 %define _GOPATH %{_builddir}/go
+%define googleapis_branch	master
 
 %global provider        github
 %global provider_tld	com
@@ -18,6 +19,7 @@ Summary:	Shattered Silicon Monitoring and Management management daemon
 License:	AGPLv3
 URL:		https://%{provider_prefix}
 Source0:	%{name}-%{version}.tar.gz
+Source1:	https://github.com/googleapis/googleapis/archive/%{googleapis_branch}/googleapis-%{googleapis_branch}.tar.gz
 
 BuildRequires:	golang, protobuf, protobuf-devel, protobuf-compiler
 
@@ -35,7 +37,8 @@ See the SSM docs for more information.
 
 
 %prep
-%setup -q -n %{repo}
+%setup -q -n %{name}
+%setup -q -T -D -a 1 -n %{name}
 
 %build
 export GOPATH=%{_GOPATH}
@@ -47,18 +50,56 @@ export GO111MODULE=off
 mkdir -p vendor/github.com/cespare/xxhash/v2
 find vendor/github.com/cespare/xxhash  ! -path '*/v2' -mindepth 1 -maxdepth 1 -exec mv {} vendor/github.com/cespare/xxhash/v2 \;
 
-cp -r $(pwd)/vendor/* %{_GOPATH}/src/
-go install gopkg.in/reform.v1/reform
-go install github.com/golang/protobuf/protoc-gen-go
-go install github.com/go-swagger/go-swagger/cmd/swagger
-go install github.com/vektra/mockery/cmd/mockery
-go install github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
-go install github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger
+mkdir -p %{_GOPATH}/src/gopkg.in
+cp -r vendor/gopkg.in/reform.v1 %{_GOPATH}/src/gopkg.in/
+cp -r vendor %{_GOPATH}/src/gopkg.in/reform.v1/
+pushd %{_GOPATH}/src/gopkg.in/reform.v1/
+    rm -rf vendor/gopkg.in/reform.v1
+    go install ./reform
+popd
+
+mkdir -p %{_GOPATH}/src/github.com/vektra
+cp -r vendor/github.com/vektra/mockery %{_GOPATH}/src/github.com/vektra/
+cp -r vendor %{_GOPATH}/src/github.com/vektra/mockery/v2/
+pushd %{_GOPATH}/src/github.com/vektra/mockery/v2/
+    rm -rf vendor/github.com/vektra/mockery
+    go build -o mockery .
+    mv mockery %{_GOPATH}/bin/
+popd
+
+mkdir -p %{_GOPATH}/src/github.com/golang
+cp -r vendor/github.com/golang/protobuf %{_GOPATH}/src/github.com/golang/
+cp -r vendor %{_GOPATH}/src/github.com/golang/protobuf/
+pushd %{_GOPATH}/src/github.com/golang/protobuf/
+    rm -rf vendor/github.com/golang/protobuf
+    go install ./protoc-gen-go
+popd
+
+mkdir -p %{_GOPATH}/src/github.com/go-swagger
+cp -r vendor/github.com/go-swagger/go-swagger %{_GOPATH}/src/github.com/go-swagger
+cp -r vendor %{_GOPATH}/src/github.com/go-swagger/go-swagger/
+pushd %{_GOPATH}/src/github.com/go-swagger/go-swagger/
+    rm -rf vendor/github.com/go-swagger/go-swagger
+    go install ./cmd/swagger
+popd
+
+mkdir -p %{_GOPATH}/src/github.com/grpc-ecosystem
+cp -r vendor/github.com/grpc-ecosystem/grpc-gateway %{_GOPATH}/src/github.com/grpc-ecosystem
+cp -r vendor %{_GOPATH}/src/github.com/grpc-ecosystem/grpc-gateway/
+pushd %{_GOPATH}/src/github.com/grpc-ecosystem/grpc-gateway/
+    rm -rf vendor/github.com/grpc-ecosystem/grpc-gateway
+    go install ./protoc-gen-grpc-gateway
+    go install ./protoc-gen-swagger
+popd
+
+mkdir -p %{_GOPATH}/src/github.com/percona
+cp -r vendor/github.com/percona/kardianos-service %{_GOPATH}/src/github.com/percona/
+
 rm -f models/*_reform.go
 go generate ./...
 rm -fr api/*.pb.* api/swagger/*.json api/swagger/client api/swagger/models
-protoc -Iapi -Ivendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/*.proto --go_out=plugins=grpc:api
-protoc -Iapi -Ivendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis api/*.proto --grpc-gateway_out=logtostderr=true,request_context=true,allow_delete_body=true:api
+protoc -Iapi -Igoogleapis-%{googleapis_branch} api/*.proto --go_out=plugins=grpc:api
+protoc -Iapi -Igoogleapis-%{googleapis_branch} api/*.proto --grpc-gateway_out=logtostderr=true,request_context=true,allow_delete_body=true:api
 
 mkdir -p %{_GOPATH}/src/%{provider}.%{provider_tld}/%{project}
 cp -r $(pwd) %{_GOPATH}/src/%{provider_prefix}
