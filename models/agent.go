@@ -152,6 +152,12 @@ type QanAgent struct {
 	QANDBInstanceUUID *string `reform:"qan_db_instance_uuid"` // MySQL instance UUID in QAN
 }
 
+// QanAgentWithServiceType QanAgent with service type
+type QanAgentWithServiceType struct {
+	QanAgent
+	ServiceType string
+}
+
 //reform:agents
 type NodeExporter struct {
 	ID           int32     `reform:"id,pk"`
@@ -220,12 +226,15 @@ func (p *SNMPExporter) DSN(service *SNMPService) string {
 }
 
 // QanAgentsRunOnServer returns qan agents run on server
-func QanAgentsRunOnServer(q *reform.Querier) ([]QanAgent, error) {
+func QanAgentsRunOnServer(q *reform.Querier) ([]QanAgentWithServiceType, error) {
 	rows, err := q.Query(`
 SELECT agents.id, agents.type, agents.runs_on_node_id, agents.service_username,
-	agents.service_password, agents.listen_port, agents.qan_db_instance_uuid
+	agents.service_password, agents.listen_port, agents.qan_db_instance_uuid,
+	services.type
 FROM agents
 JOIN nodes ON agents.runs_on_node_id = nodes.id
+LEFT JOIN agent_services ON agents.id = agent_services.agent_id
+LEFT JOIN services ON agent_services.service_id = services.id
 WHERE nodes.type = ? AND agents.type = ?
 `, PMMServerNodeType, QanAgentAgentType)
 	if err != nil {
@@ -233,22 +242,24 @@ WHERE nodes.type = ? AND agents.type = ?
 	}
 	defer rows.Close()
 
-	agents := make([]QanAgent, 0)
+	agents := make([]QanAgentWithServiceType, 0)
 	for rows.Next() {
 		var id, runsOnNodeID int32
 		var listenPort sql.NullInt16
 		var t AgentType
-		var serviceUsername, servicePassword, instanceUUID sql.NullString
+		var serviceUsername, servicePassword, instanceUUID, serviceType sql.NullString
 
-		err = rows.Scan(&id, &t, &runsOnNodeID, &serviceUsername, &servicePassword, &listenPort, &instanceUUID)
+		err = rows.Scan(&id, &t, &runsOnNodeID, &serviceUsername, &servicePassword, &listenPort, &instanceUUID, &serviceType)
 		if err != nil {
 			return nil, err
 		}
 
-		agent := QanAgent{
-			ID:           id,
-			Type:         t,
-			RunsOnNodeID: runsOnNodeID,
+		agent := QanAgentWithServiceType{
+			QanAgent: QanAgent{
+				ID:           id,
+				Type:         t,
+				RunsOnNodeID: runsOnNodeID,
+			},
 		}
 		if serviceUsername.Valid {
 			agent.ServiceUsername = &servicePassword.String
@@ -262,6 +273,9 @@ WHERE nodes.type = ? AND agents.type = ?
 		if listenPort.Valid {
 			port := uint16(listenPort.Int16)
 			agent.ListenPort = &port
+		}
+		if serviceType.Valid {
+			agent.ServiceType = serviceType.String
 		}
 
 		agents = append(agents, agent)
