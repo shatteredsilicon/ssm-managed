@@ -179,7 +179,7 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 		return err
 	}
 
-	agentInstance, dbInstance, err := svc.restoreConfigs(ctx, agent)
+	agentInstance, dbInstance, err := svc.restoreConfigs(ctx, models.QanAgentWithServiceType{QanAgent: agent})
 	if err != nil {
 		l.Infof("restoreConfigs err: %v", err)
 		return err
@@ -232,7 +232,7 @@ func (svc *Service) RestoreConfigs(ctx context.Context, q *reform.Querier) error
 	return nil
 }
 
-func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgent) (*proto.Instance, *proto.Instance, error) {
+func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWithServiceType) (*proto.Instance, *proto.Instance, error) {
 	l := logger.Get(ctx).WithField("component", "qan")
 
 	qanURL, err := getQanURL(ctx)
@@ -381,6 +381,9 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgent) (
 	path = filepath.Join(svc.baseDir, "config", fmt.Sprintf("qan-%s.conf", dbInstance.UUID))
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		qanConf := fmt.Sprintf(`{ "UUID": "%s", "CollectFrom": "%s", "Interval": 60, "ExampleQueries": true }`, dbInstance.UUID, PerfschemaCollectFrom)
+		if agent.ServiceType == string(models.RDSServiceType) {
+			qanConf = fmt.Sprintf(`{ "UUID": "%s", "CollectFrom": "%s", "Interval": 60, "ExampleQueries": true }`, dbInstance.UUID, RDSSlowlogCollectFrom)
+		}
 
 		qanConfig, err := svc.getQANConfig(ctx, qanURL, dbInstance.UUID)
 		if err != nil {
