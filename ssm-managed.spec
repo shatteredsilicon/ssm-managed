@@ -18,7 +18,7 @@ Summary:	Shattered Silicon Monitoring and Management management daemon
 
 License:	AGPLv3
 URL:		https://%{provider_prefix}
-Source0:	%{name}-%{version}.tar.gz
+Source0:	%{name}-%{version}-%{release}.tar.gz
 Source1:	https://github.com/googleapis/googleapis/archive/%{googleapis_branch}/googleapis-%{googleapis_branch}.tar.gz
 
 BuildRequires:	golang, protobuf, protobuf-devel, protobuf-compiler
