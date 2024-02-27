@@ -1,78 +1,50 @@
-all: test
+BUILDDIR	?= /tmp/ssmbuild
+VERSION		?= 9.4.1
+RELEASE		?= 1
 
-# installs tools to $GOBIN (or $GOPATH/bin) which is expected to be in $PATH
-init:
-	go install -v ./vendor/gopkg.in/reform.v1/reform
-	go install -v ./vendor/github.com/vektra/mockery/cmd/mockery
-	go get -u github.com/prometheus/prometheus/cmd/promtool
+ifeq (0, $(shell hash dpkg 2>/dev/null; echo $$?))
+ARCH	:= $(shell dpkg --print-architecture)
+else
+ARCH	:= $(shell rpm --eval "%{_arch}")
+endif
 
-	go install -v ./vendor/github.com/golang/protobuf/protoc-gen-go
-	go install -v ./vendor/github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
-	go install -v ./vendor/github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger
-	go install -v ./vendor/github.com/go-swagger/go-swagger/cmd/swagger
+TARBALL_FILE	:= $(BUILDDIR)/tarballs/ssm-managed-$(VERSION)-$(RELEASE).tar.gz
+SRPM_FILE		:= $(BUILDDIR)/results/SRPMS/ssm-managed-$(VERSION)-$(RELEASE).src.rpm
+RPM_FILE		:= $(BUILDDIR)/results/RPMS/ssm-managed-$(VERSION)-$(RELEASE).$(ARCH).rpm
 
-	go get -u github.com/AlekSi/gocoverutil
+.PHONY: all
+all: srpm rpm
 
-	go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+$(TARBALL_FILE):
+	mkdir -vp $(shell dirname $(TARBALL_FILE))
 
-check-license:
-	go run .github/check-license.go
+	GO111MODULE=on go mod vendor
 
-install: check-license
-	go install -v ./...
-	go test -v -i ./...
+	tar -czf $(TARBALL_FILE) -C $(shell dirname $(CURDIR)) --transform s/$(shell basename $(CURDIR))/ssm-managed/ $(shell basename $(CURDIR))
 
-install-race: check-license
-	go install -v -race ./...
-	go test -v -race -i ./...
+.PHONY: srpm
+srpm: $(SRPM_FILE)
 
-test: install
-	go test -v -p 1 ./...
+$(SRPM_FILE): $(TARBALL_FILE)
+	mkdir -vp $(BUILDDIR)/rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
+	mkdir -vp $(shell dirname $(SRPM_FILE))
 
-test-race: install-race
-	go test -v -p 1 -race ./...
+	cp ssm-managed.spec $(BUILDDIR)/rpmbuild/SPECS/ssm-managed.spec
+	sed -i "s/%{_version}/$(VERSION)/g" "$(BUILDDIR)/rpmbuild/SPECS/ssm-managed.spec"
+	sed -i "s/%{_release}/$(RELEASE)/g" "$(BUILDDIR)/rpmbuild/SPECS/ssm-managed.spec"
+	cp $(TARBALL_FILE) $(BUILDDIR)/rpmbuild/SOURCES/
+	spectool -C $(BUILDDIR)/rpmbuild/SOURCES/ -g $(BUILDDIR)/rpmbuild/SPECS/ssm-managed.spec
+	rpmbuild -bs --define "debug_package %{nil}" --define "_topdir $(BUILDDIR)/rpmbuild" $(BUILDDIR)/rpmbuild/SPECS/ssm-managed.spec
+	mv $(BUILDDIR)/rpmbuild/SRPMS/$(shell basename $(SRPM_FILE)) $(SRPM_FILE)
 
-cover: install
-	gocoverutil -ignore=github.com/shatteredsilicon/ssm-managed/api/... test -v -p 1 ./...
+.PHONY: rpm
+rpm: $(RPM_FILE)
 
-check: install
-	golangci-lint run
+$(RPM_FILE): $(SRPM_FILE)
+	mkdir -vp $(BUILDDIR)/mock $(shell dirname $(RPM_FILE))
+	mock -r ssm-9-$$(rpm --eval "%{_arch}") --resultdir $(BUILDDIR)/mock --rebuild $(SRPM_FILE)
+	mv $(BUILDDIR)/mock/$(shell basename $(RPM_FILE)) $(RPM_FILE)
 
-run: install _run
-
-run-race: install-race _run
-
-_run:
-	pmm-managed -swagger=rest -debug \
-		-agent-mysqld-exporter=mysqld_exporter \
-		-agent-postgres-exporter=postgres_exporter \
-		-agent-rds-exporter=rds_exporter \
-		-agent-rds-exporter-config=testdata/rds_exporter/rds_exporter.yml \
-		-prometheus-config=testdata/prometheus/prometheus.yml \
-		-db-name=pmm-managed-dev
-
-gen:
-	rm -f models/*_reform.go
-
-	go generate ./...
-
-	rm -fr api/*.pb.* api/swagger/*.json api/swagger/client api/swagger/models
-
-	protoc -Iapi -Ivendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
-		api/*.proto --go_out=plugins=grpc:api
-	protoc -Iapi -Ivendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
-		api/*.proto --grpc-gateway_out=logtostderr=true,request_context=true,allow_delete_body=true:api
-	protoc -Iapi -Ivendor/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
-		api/*.proto --swagger_out=logtostderr=true,allow_delete_body=true:api/swagger
-
-	swagger mixin api/swagger/*.swagger.json > api/swagger/swagger.json
-	swagger validate api/swagger/swagger.json
-	swagger generate client -f api/swagger/swagger.json -t api/swagger -A pmm-managed
-
-	go install -v github.com/shatteredsilicon/ssm-managed/api github.com/shatteredsilicon/ssm-managed/api/swagger/client
-
-up:
-	docker-compose up --force-recreate --abort-on-container-exit --renew-anon-volumes --remove-orphans
-
-down:
-	docker-compose down --volumes --remove-orphans
+.PHONY: clean
+clean:
+	rm -rf $(BUILDDIR)/*
