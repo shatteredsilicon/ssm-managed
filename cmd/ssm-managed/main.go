@@ -65,7 +65,6 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/services/snmp"
 	"github.com/shatteredsilicon/ssm-managed/services/supervisor"
-	"github.com/shatteredsilicon/ssm-managed/services/telemetry"
 	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/interceptors"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
@@ -634,37 +633,6 @@ func runDebugServer(ctx context.Context) {
 	cancel()
 }
 
-func runTelemetryService(ctx context.Context, consulClient *consul.Client) {
-	l := logrus.WithField("component", "telemetry")
-
-	uuid, err := getTelemetryUUID(consulClient)
-	if err != nil {
-		l.Panicf("cannot get/set telemetry UUID in Consul: %s", err)
-	}
-
-	svc := telemetry.NewService(uuid, utils.Version)
-	svc.Run(ctx)
-}
-
-func getTelemetryUUID(consulClient *consul.Client) (string, error) {
-	b, err := consulClient.GetKV("telemetry/uuid")
-	if err != nil {
-		return "", err
-	}
-	if len(b) > 0 {
-		return string(b), nil
-	}
-
-	uuid, err := telemetry.GenerateUUID()
-	if err != nil {
-		return "", err
-	}
-	if err = consulClient.PutKV("telemetry/uuid", []byte(uuid)); err != nil {
-		return "", err
-	}
-	return uuid, nil
-}
-
 func main() {
 	log.SetFlags(0)
 	log.Printf("ssm-managed %s", utils.Version)
@@ -832,12 +800,6 @@ func main() {
 	go func() {
 		defer wg.Done()
 		runDebugServer(ctx)
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		runTelemetryService(ctx, consulClient)
 	}()
 
 	wg.Wait()
