@@ -34,6 +34,7 @@ import (
 	"syscall"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/pkg/errors"
@@ -41,6 +42,7 @@ import (
 	"github.com/revel/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"golang.org/x/net/proxy"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 	"gopkg.in/reform.v1"
@@ -108,6 +110,19 @@ var (
 
 	debugF = flag.Bool("debug", false, "Enable debug logging")
 )
+
+func init() {
+	proxyDialer := proxy.FromEnvironment()
+	directDialer := proxy.Direct
+	mysqlDriver.RegisterDialContext("tcp", func(ctx context.Context, addr string) (net.Conn, error) {
+		host, _, _ := net.SplitHostPort(addr)
+		if utils.SliceContains([]string{"localhost", "127.0.0.1"}, host) {
+			return directDialer.Dial("tcp", addr)
+		} else {
+			return proxyDialer.Dial("tcp", addr)
+		}
+	})
+}
 
 func addSwaggerHandler(mux *http.ServeMux) {
 	// TODO embed swagger resources?
