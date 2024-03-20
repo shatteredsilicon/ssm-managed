@@ -123,7 +123,11 @@ func (svc *Service) removeNodeFromConsul(ctx context.Context, nodeID string) err
 	}
 
 	_, err = svc.consul.DeregisterNode(node.Node.Node)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return svc.consul.DeleteKVTree(node.Node.Node)
 }
 
 // RemoveService removes service of node,

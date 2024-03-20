@@ -39,6 +39,7 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/pkg/errors"
+	prometheusapi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/revel/config"
 	pc "github.com/shatteredsilicon/ssm/proto/config"
@@ -56,6 +57,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 	"github.com/shatteredsilicon/ssm-managed/services/logs"
+	"github.com/shatteredsilicon/ssm-managed/services/metric"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
@@ -633,6 +635,13 @@ func runDebugServer(ctx context.Context) {
 	cancel()
 }
 
+func runMetricService(ctx context.Context, consulClient *consul.Client, prometheusSvc *prometheus.Service, prometheusAPI prometheusapi.Client) {
+	l := logrus.WithField("component", "metric")
+
+	svc := metric.NewService(consulClient, prometheusSvc, prometheusAPI, l)
+	svc.Run(ctx)
+}
+
 func main() {
 	log.SetFlags(0)
 	log.Printf("ssm-managed %s", utils.Version)
@@ -679,6 +688,13 @@ func main() {
 	}
 	if err != nil {
 		l.Panicf("Prometheus service problem: %+v", err)
+	}
+
+	prometheusAPI, err := prometheusapi.NewClient(prometheusapi.Config{
+		Address: *prometheusURLF,
+	})
+	if err != nil {
+		l.Panic(err)
 	}
 
 	supervisor := supervisor.New(l)
@@ -800,6 +816,12 @@ func main() {
 	go func() {
 		defer wg.Done()
 		runDebugServer(ctx)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runMetricService(ctx, consulClient, prometheus, prometheusAPI)
 	}()
 
 	wg.Wait()

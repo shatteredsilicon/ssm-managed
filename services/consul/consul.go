@@ -84,6 +84,16 @@ func (c *Client) DeregisterService(nodeID, serviceID string) (*api.WriteMeta, er
 // GetKV returns value for a given key from Consul, or nil, if key does not exist.
 func (c *Client) GetKV(key string) ([]byte, error) {
 	key = path.Join(prefix, key)
+	return c.getKV(key)
+}
+
+// GetExactKV returns value for a given key (without prefix) from Consul,
+// or nil, if key does not exist.
+func (c *Client) GetExactKV(key string) ([]byte, error) {
+	return c.getKV(key)
+}
+
+func (c *Client) getKV(key string) ([]byte, error) {
 	pair, _, err := c.c.KV().Get(key, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot get key %q", key)
@@ -97,6 +107,15 @@ func (c *Client) GetKV(key string) ([]byte, error) {
 // PutKV puts given key/value pair into Consul.
 func (c *Client) PutKV(key string, value []byte) error {
 	key = path.Join(prefix, key)
+	return c.putKV(key, value)
+}
+
+// PutExactKV puts given key/value pair into Consul.
+func (c *Client) PutExactKV(key string, value []byte) error {
+	return c.putKV(key, value)
+}
+
+func (c *Client) putKV(key string, value []byte) error {
 	pair := &api.KVPair{Key: key, Value: value}
 	_, err := c.c.KV().Put(pair, nil)
 	return errors.Wrapf(err, "cannot put key %q", key)
@@ -109,14 +128,7 @@ func (c *Client) DeleteKV(key string) error {
 	return errors.Wrapf(err, "cannot delete key %q", key)
 }
 
-// GetNoPrefixKV returns value for a given key from Consul, or nil, if key does not exist.
-func (c *Client) GetNoPrefixKV(key string) ([]byte, error) {
-	pair, _, err := c.c.KV().Get(key, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get key %q", key)
-	}
-	if pair == nil {
-		return nil, nil
-	}
-	return pair.Value, nil
+func (c *Client) DeleteKVTree(key string) error {
+	_, err := c.c.KV().DeleteTree(key, nil)
+	return errors.Wrapf(err, "cannot delete kv tree %q", key)
 }
