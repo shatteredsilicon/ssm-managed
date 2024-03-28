@@ -39,6 +39,7 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/pkg/errors"
+	prometheusapi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/revel/config"
 	pc "github.com/shatteredsilicon/ssm/proto/config"
@@ -56,6 +57,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 	"github.com/shatteredsilicon/ssm-managed/services/logs"
+	"github.com/shatteredsilicon/ssm-managed/services/metric"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
@@ -65,7 +67,6 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/services/snmp"
 	"github.com/shatteredsilicon/ssm-managed/services/supervisor"
-	"github.com/shatteredsilicon/ssm-managed/services/telemetry"
 	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/interceptors"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
@@ -634,35 +635,11 @@ func runDebugServer(ctx context.Context) {
 	cancel()
 }
 
-func runTelemetryService(ctx context.Context, consulClient *consul.Client) {
-	l := logrus.WithField("component", "telemetry")
+func runMetricService(ctx context.Context, consulClient *consul.Client, prometheusSvc *prometheus.Service, prometheusAPI prometheusapi.Client) {
+	l := logrus.WithField("component", "metric")
 
-	uuid, err := getTelemetryUUID(consulClient)
-	if err != nil {
-		l.Panicf("cannot get/set telemetry UUID in Consul: %s", err)
-	}
-
-	svc := telemetry.NewService(uuid, utils.Version)
+	svc := metric.NewService(consulClient, prometheusSvc, prometheusAPI, l)
 	svc.Run(ctx)
-}
-
-func getTelemetryUUID(consulClient *consul.Client) (string, error) {
-	b, err := consulClient.GetKV("telemetry/uuid")
-	if err != nil {
-		return "", err
-	}
-	if len(b) > 0 {
-		return string(b), nil
-	}
-
-	uuid, err := telemetry.GenerateUUID()
-	if err != nil {
-		return "", err
-	}
-	if err = consulClient.PutKV("telemetry/uuid", []byte(uuid)); err != nil {
-		return "", err
-	}
-	return uuid, nil
 }
 
 func main() {
@@ -711,6 +688,13 @@ func main() {
 	}
 	if err != nil {
 		l.Panicf("Prometheus service problem: %+v", err)
+	}
+
+	prometheusAPI, err := prometheusapi.NewClient(prometheusapi.Config{
+		Address: *prometheusURLF,
+	})
+	if err != nil {
+		l.Panic(err)
 	}
 
 	supervisor := supervisor.New(l)
@@ -837,7 +821,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runTelemetryService(ctx, consulClient)
+		runMetricService(ctx, consulClient, prometheus, prometheusAPI)
 	}()
 
 	wg.Wait()

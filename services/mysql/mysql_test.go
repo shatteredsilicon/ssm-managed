@@ -267,7 +267,7 @@ func TestNormalizeEngineAndEngineVersion(t *testing.T) {
 	}
 
 	for _, params := range parameters {
-		engine, engineVersion, err := normalizeEngineAndEngineVersion(params.versionComment, params.version)
+		engine, engineVersion, err := NormalizeEngineAndEngineVersion(params.versionComment, params.version)
 		assert.NoError(t, err)
 
 		assert.Equal(t, params.expectedEngine, engine, "engine is not equal")
