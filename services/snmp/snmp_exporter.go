@@ -7,14 +7,31 @@ import (
 )
 
 type snmpGeneratorConfig struct {
+	Auths   map[string]*config.Auth         `yaml:"auths"`
 	Modules map[string]*snmpGeneratorModule `yaml:"modules"`
+	Version int                             `yaml:"version,omitempty"`
 }
 
 type snmpGeneratorModule struct {
-	Walk       []string               `yaml:"walk"`
-	WalkParams config.WalkParams      `yaml:",inline"`
-	Lookups    []interface{}          `yaml:"lookups"`
-	Overrides  map[string]interface{} `yaml:"overrides"`
+	Walk       []string                          `yaml:"walk"`
+	Lookups    []*snmpGeneratorLookup            `yaml:"lookups"`
+	WalkParams config.WalkParams                 `yaml:",inline"`
+	Overrides  map[string]snmpGeneratorOverrides `yaml:"overrides"`
+	Filters    config.Filters                    `yaml:"filters,omitempty"`
+}
+
+type snmpGeneratorLookup struct {
+	SourceIndexes     []string `yaml:"source_indexes"`
+	Lookup            string   `yaml:"lookup"`
+	DropSourceIndexes bool     `yaml:"drop_source_indexes,omitempty"`
+}
+
+type snmpGeneratorOverrides struct {
+	Ignore         bool                              `yaml:"ignore,omitempty"`
+	RegexpExtracts map[string][]config.RegexpExtract `yaml:"regex_extracts,omitempty"`
+	Offset         float64                           `yaml:"offset,omitempty"`
+	Scale          float64                           `yaml:"scale,omitempty"`
+	Type           string                            `yaml:"type,omitempty"`
 }
 
 func (config *snmpGeneratorConfig) Marshal() ([]byte, error) {
