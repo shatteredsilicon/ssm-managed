@@ -39,6 +39,7 @@ const (
 var (
 	snmpEngine   = "SNMP"
 	snmpModule   = "ssm_mib"
+	snmpAuth     = "ssm_auth"
 	snmpVersions = []string{"1", "2", "3"}
 )
 
@@ -110,6 +111,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		MetricsPath:    "/snmp",
 		Params: url.Values{
 			"module": []string{snmpModule},
+			"auth":   []string{snmpAuth},
 		},
 		HonorLabels: true,
 		RelabelConfigs: []prometheus.RelabelConfig{
@@ -344,15 +346,20 @@ func (svc *Service) generateSNMPConfig(
 		return errors.Errorf("snmp_exporter generator config file is broken")
 	}
 
-	config.Modules[snmpModule].WalkParams.Version = version
-	config.Modules[snmpModule].WalkParams.Auth.Community = snmpConfig.Secret(community)
-	config.Modules[snmpModule].WalkParams.Auth.AuthProtocol = authProtocol
-	config.Modules[snmpModule].WalkParams.Auth.Username = username
-	config.Modules[snmpModule].WalkParams.Auth.Password = snmpConfig.Secret(password)
-	config.Modules[snmpModule].WalkParams.Auth.SecurityLevel = securityLevel
-	config.Modules[snmpModule].WalkParams.Auth.PrivProtocol = privProtocol
-	config.Modules[snmpModule].WalkParams.Auth.PrivPassword = snmpConfig.Secret(privPassword)
-	config.Modules[snmpModule].WalkParams.Auth.ContextName = contextName
+	if config.Auths == nil {
+		config.Auths = make(map[string]*snmpConfig.Auth)
+	}
+	config.Auths[snmpAuth] = &snmpConfig.Auth{
+		Community:     snmpConfig.Secret(community),
+		SecurityLevel: securityLevel,
+		Username:      username,
+		Password:      snmpConfig.Secret(password),
+		AuthProtocol:  authProtocol,
+		PrivProtocol:  privProtocol,
+		PrivPassword:  snmpConfig.Secret(privPassword),
+		ContextName:   contextName,
+		Version:       version,
+	}
 
 	// update snmp_exporter configuration
 	snmpConfig.DoNotHideSecrets = true
@@ -366,7 +373,7 @@ func (svc *Service) generateSNMPConfig(
 		return err
 	}
 
-	cmd := exec.Command(svc.SNMPGeneratorPath, "generate", "-i", svc.generatorConfigPath(name), "-o", svc.exporterConfigPath(name))
+	cmd := exec.Command(svc.SNMPGeneratorPath, "generate", "-g", svc.generatorConfigPath(name), "-o", svc.exporterConfigPath(name))
 	return cmd.Run()
 }
 
