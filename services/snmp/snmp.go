@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"path"
 	"sort"
@@ -33,7 +34,9 @@ import (
 )
 
 const (
-	defaultSNMPPort uint32 = 161
+	defaultSNMPPort  uint32 = 161
+	defaultCommunity string = "public"
+	defaultVersion   int    = 2
 )
 
 var (
@@ -433,4 +436,66 @@ func (svc *Service) clientInstanceAdded(ctx context.Context, name string) (bool,
 	}
 
 	return false, nil
+}
+
+// Restore configuration from database.
+func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
+	nodes, err := tx.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	for _, n := range nodes {
+		node := n.(*models.RemoteNode)
+
+		snmpServices, e := tx.SelectAllFrom(models.SNMPServiceTable, "WHERE node_id = ? AND type = ?", node.ID, models.SNMPServiceType)
+		if e != nil {
+			return errors.WithStack(e)
+		}
+		if len(snmpServices) == 0 {
+			continue
+		}
+
+		service := snmpServices[0].(*models.SNMPService)
+		agents, err := models.AgentsForServiceID(tx.Querier, service.ID)
+		if err != nil {
+			return err
+		}
+		for _, agent := range agents {
+			switch agent.Type {
+			case models.SNMPExporterAgentType:
+				a := &models.SNMPExporter{ID: agent.ID}
+				if err = tx.Reload(a); err != nil {
+					return errors.WithStack(err)
+				}
+				if svc.SNMPGeneratorPath != "" {
+					// generate snmp.yml if not exists
+					if _, err := os.Stat(svc.exporterConfigPath(node.Name)); errors.Is(err, os.ErrNotExist) {
+						if err := svc.generateSNMPConfig(
+							node.Name, "", "", defaultVersion, defaultCommunity,
+							"", "", "", "", "",
+						); err != nil {
+							return err
+						}
+					}
+				}
+				if svc.SNMPExporterPath != "" {
+					name := models.NameForSupervisor(a.Type, *a.ListenPort)
+
+					err := svc.Supervisor.Status(ctx, name)
+					if err == nil {
+						if err = svc.Supervisor.Stop(ctx, name); err != nil {
+							return err
+						}
+					}
+
+					cfg := svc.snmpExporterServiceConfig(a, node.Name)
+					if err = svc.Supervisor.Start(ctx, cfg); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }

@@ -245,6 +245,12 @@ func makeSNMPService(ctx context.Context, deps *serviceDependencies, consul *con
 	if err != nil {
 		return nil, err
 	}
+	err = deps.db.InTransaction(func(tx *reform.TX) error {
+		return snmpService.Restore(ctx, tx)
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return snmpService, nil
 }
