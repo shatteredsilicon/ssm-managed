@@ -50,7 +50,7 @@ func (s *SNMPServer) List(ctx context.Context, req *api.SNMPListRequest) (*api.S
 				Address:       *db.Service.Address,
 				Port:          uint32(*db.Service.Port),
 				Engine:        *db.Service.Engine,
-				EngineVersion: *db.Service.EngineVersion,
+				EngineVersion: db.Service.EngineVersion.Version,
 			},
 		})
 	}

@@ -34,9 +34,11 @@ import (
 )
 
 const (
-	defaultSNMPPort  uint32 = 161
-	defaultCommunity string = "public"
-	defaultVersion   int    = 2
+	defaultSNMPPort      uint32 = 161
+	defaultCommunity     string = "public"
+	defaultVersion       string = "2"
+	defaultUsername      string = "admin"
+	defaultSecurityLevel string = "noAuthNoPriv"
 )
 
 var (
@@ -210,7 +212,7 @@ func (svc *Service) snmpExporterServiceConfig(agent *models.SNMPExporter, instan
 	}
 }
 
-func (svc *Service) addSNMPExporter(ctx context.Context, tx *reform.TX, service *models.SNMPService, instanceName string) error {
+func (svc *Service) addSNMPExporter(ctx context.Context, tx *reform.TX, service *models.SNMPService, instanceName, username, password string) error {
 	port, err := svc.PortsRegistry.Reserve()
 	if err != nil {
 		return err
@@ -218,10 +220,11 @@ func (svc *Service) addSNMPExporter(ctx context.Context, tx *reform.TX, service 
 
 	// insert snmp_exporter agent and association
 	agent := &models.SNMPExporter{
-		Type:         models.SNMPExporterAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
-
-		ListenPort: &port,
+		Type:            models.SNMPExporterAgentType,
+		RunsOnNodeID:    svc.ssmServerNode.ID,
+		ListenPort:      &port,
+		ServiceUsername: &username,
+		ServicePassword: &password,
 	}
 	if err := tx.Insert(agent); err != nil {
 		return errors.WithStack(err)
@@ -258,6 +261,9 @@ func (svc *Service) Add(
 	}
 	if !utils.SliceContains(snmpVersions, version) {
 		return 0, status.Error(codes.InvalidArgument, "Unsupported SNMP version")
+	}
+	if community == "" {
+		community = defaultCommunity
 	}
 
 	// check if instance is added on client side
@@ -298,24 +304,31 @@ func (svc *Service) Add(
 			Type:   models.SNMPServiceType,
 			NodeID: node.ID,
 
-			Address:       &address,
-			Port:          pointer.ToUint16(uint16(port)),
-			Engine:        &snmpEngine,
-			EngineVersion: &version,
+			PrivPassword: &privPassword,
+			Address:      &address,
+			Port:         pointer.ToUint16(uint16(port)),
+			Engine:       &snmpEngine,
+			EngineVersion: &models.SNMPEngineVersion{
+				Version:       version,
+				Community:     community,
+				SecurityLevel: securityLevel,
+				AuthProtocol:  authProtocol,
+				PrivProtocol:  privPassword,
+				ContextName:   contextName,
+			},
 		}
 		if err := tx.Insert(service); err != nil {
 			return errors.WithStack(err)
 		}
 
-		intVersion, _ := strconv.Atoi(version)
 		if err := svc.generateSNMPConfig(
-			name, username, password, intVersion, community, securityLevel,
+			name, username, password, version, community, securityLevel,
 			authProtocol, privProtocol, privPassword, contextName,
 		); err != nil {
 			return err
 		}
 
-		if err := svc.addSNMPExporter(ctx, tx, service, name); err != nil {
+		if err := svc.addSNMPExporter(ctx, tx, service, name, username, password); err != nil {
 			return err
 		}
 
@@ -328,7 +341,7 @@ func (svc *Service) Add(
 func (svc *Service) generateSNMPConfig(
 	name string,
 	username, password string,
-	version int, community string,
+	version, community string,
 	securityLevel string,
 	authProtocol, privProtocol string,
 	privPassword string,
@@ -352,6 +365,7 @@ func (svc *Service) generateSNMPConfig(
 	if config.Auths == nil {
 		config.Auths = make(map[string]*snmpConfig.Auth)
 	}
+	intVersion, _ := strconv.Atoi(version)
 	config.Auths[snmpAuth] = &snmpConfig.Auth{
 		Community:     snmpConfig.Secret(community),
 		SecurityLevel: securityLevel,
@@ -361,7 +375,7 @@ func (svc *Service) generateSNMPConfig(
 		PrivProtocol:  privProtocol,
 		PrivPassword:  snmpConfig.Secret(privPassword),
 		ContextName:   contextName,
-		Version:       version,
+		Version:       intVersion,
 	}
 
 	// update snmp_exporter configuration
@@ -463,6 +477,19 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 		}
 
 		service := snmpServices[0].(*models.SNMPService)
+		if service.EngineVersion == nil {
+			service.EngineVersion = &models.SNMPEngineVersion{}
+		}
+		if service.EngineVersion.Version == "" {
+			service.EngineVersion.Version = defaultVersion
+		}
+		if service.EngineVersion.Community == "" {
+			service.EngineVersion.Community = defaultCommunity
+		}
+		if service.EngineVersion.SecurityLevel == "" {
+			service.EngineVersion.SecurityLevel = defaultSecurityLevel
+		}
+
 		agents, err := models.AgentsForServiceID(tx.Querier, service.ID)
 		if err != nil {
 			return err
@@ -474,12 +501,25 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 				if err = tx.Reload(a); err != nil {
 					return errors.WithStack(err)
 				}
+
+				username := defaultUsername
+				var authPassword, privPasssword string
+				if a.ServiceUsername != nil {
+					username = *a.ServiceUsername
+				}
+				if a.ServicePassword != nil {
+					authPassword = *a.ServicePassword
+				}
+				if service.PrivPassword != nil {
+					privPasssword = *service.PrivPassword
+				}
 				if svc.SNMPGeneratorPath != "" {
 					// generate snmp.yml if not exists
 					if _, err := os.Stat(svc.exporterConfigPath(node.Name)); errors.Is(err, os.ErrNotExist) {
 						if err := svc.generateSNMPConfig(
-							node.Name, "", "", defaultVersion, defaultCommunity,
-							"", "", "", "", "",
+							node.Name, username, authPassword, service.EngineVersion.Version, service.EngineVersion.Community,
+							service.EngineVersion.SecurityLevel, service.EngineVersion.AuthProtocol, service.EngineVersion.PrivProtocol,
+							privPasssword, service.EngineVersion.ContextName,
 						); err != nil {
 							return err
 						}
