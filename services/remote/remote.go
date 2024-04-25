@@ -80,6 +80,10 @@ func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 		services := make([]models.RemoteService, len(structs))
 		for i, str := range structs {
 			services[i] = *str.(*models.RemoteService)
+			if services[i].Type == models.SNMPServiceType && services[i].EngineVersion != nil {
+				ev := models.SNMPEngineVersionFromString(*services[i].EngineVersion)
+				services[i].EngineVersion = &ev.Version
+			}
 		}
 
 		for _, node := range nodes {
@@ -118,6 +122,10 @@ func (svc *Service) ListFull(ctx context.Context) ([]FullInstance, error) {
 		services := make([]models.FullService, len(structs))
 		for i, str := range structs {
 			services[i] = *str.(*models.FullService)
+			if services[i].Type == models.SNMPServiceType && services[i].EngineVersion != nil {
+				ev := models.SNMPEngineVersionFromString(*services[i].EngineVersion)
+				services[i].EngineVersion = &ev.Version
+			}
 		}
 
 		structs, e = tx.SelectAllFrom(models.FullAgentTable, "ORDER BY id")

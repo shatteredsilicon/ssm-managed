@@ -16,6 +16,13 @@
 
 package models
 
+import (
+	"database/sql/driver"
+	"fmt"
+	"reflect"
+	"strings"
+)
+
 //go:generate reform
 
 type ServiceType string
@@ -85,10 +92,83 @@ type SNMPService struct {
 	Type   ServiceType `reform:"type"`
 	NodeID int32       `reform:"node_id"`
 
-	Address       *string `reform:"address"`
-	Port          *uint16 `reform:"port"`
-	Engine        *string `reform:"engine"`
-	EngineVersion *string `reform:"engine_version"`
+	PrivPassword *string `reform:"aws_secret_key"`
+	Address      *string `reform:"address"`
+	Port         *uint16 `reform:"port"`
+	Engine       *string `reform:"engine"`
+	// EngineVersion is in format:
+	// for v1 or v2 - <version>:<community>
+	// for v3 - <version>:<security_level>:<auth_protocol>:<priv_protocol>:<context_name>
+	// e.g. 1:public, 2:public, 3:authPriv:MD5:DES:public
+	EngineVersion *SNMPEngineVersion `reform:"engine_version"`
+}
+
+type SNMPEngineVersion struct {
+	Version       string
+	Community     string
+	SecurityLevel string
+	AuthProtocol  string
+	PrivProtocol  string
+	ContextName   string
+}
+
+func (ev *SNMPEngineVersion) Scan(src interface{}) error {
+	str, ok := src.([]byte)
+	if !ok {
+		return fmt.Errorf("incompatible type: %s", reflect.ValueOf(src).Kind().String())
+	}
+	if str == nil {
+		return nil
+	}
+
+	engineVersion := SNMPEngineVersionFromString(string(str))
+	ev.Version = engineVersion.Version
+	ev.Community = engineVersion.Community
+	ev.SecurityLevel = engineVersion.SecurityLevel
+	ev.AuthProtocol = engineVersion.AuthProtocol
+	ev.PrivProtocol = engineVersion.PrivProtocol
+	ev.ContextName = engineVersion.ContextName
+
+	return nil
+}
+
+func (ev SNMPEngineVersion) Value() (driver.Value, error) {
+	switch ev.Version {
+	case "1", "2":
+		return fmt.Sprintf("%s:%s", ev.Version, ev.Community), nil
+	default:
+		return fmt.Sprintf("%s:%s:%s:%s:%s", ev.Version, ev.SecurityLevel, ev.AuthProtocol, ev.PrivProtocol, ev.ContextName), nil
+	}
+}
+
+func SNMPEngineVersionFromString(str string) SNMPEngineVersion {
+	ev := SNMPEngineVersion{}
+
+	strs := strings.SplitN(str, ":", 2)
+	ev.Version = strs[0]
+	switch ev.Version {
+	case "1", "2":
+		if len(strs) > 1 {
+			ev.Community = strs[1]
+		}
+	default:
+		strs := strings.SplitN(str, ":", 5)
+		strsLen := len(strs)
+		if strsLen > 1 {
+			ev.SecurityLevel = strs[1]
+		}
+		if strsLen > 2 {
+			ev.AuthProtocol = strs[2]
+		}
+		if strsLen > 3 {
+			ev.PrivProtocol = strs[3]
+		}
+		if strsLen > 4 {
+			ev.ContextName = strs[4]
+		}
+	}
+
+	return ev
 }
 
 //reform:services
