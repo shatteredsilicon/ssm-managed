@@ -129,6 +129,32 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 				Replacement: "linux",
 			},
 		},
+		MetricRelabelConfigs: []prometheus.RelabelConfig{
+			{
+				SourceLabels: prometheusModel.LabelNames{"__name__"},
+				TargetLabel:  "__name__",
+				Regex:        "(node_disk_reads_completed|node_disk_writes_completed|node_disk_io_time_ms|node_intr|node_forks|node_context_switches|node_vmstat_pswpin|node_vmstat_pswpout|node_vmstat_pgpgin|node_vmstat_pgpgout|node_disk_write_time_ms|node_disk_read_time_ms|node_network_receive_bytes|node_network_transmit_bytes|node_disk_reads_merged|node_disk_writes_merged|node_disk_sectors_read|node_disk_sectors_written|node_netstat_Tcp_RetransSegs|node_netstat_Tcp_OutSegs|node_netstat_Tcp_InSegs|node_netstat_Udp_InDatagrams|node_netstat_Udp_InErrors|node_netstat_Udp_OutDatagrams|node_netstat_Udp_NoPorts|node_netstat_Udp_InCsumErrors|node_netstat_Udp_RcvbufErrors|node_netstat_Udp_SndbufErrors|node_netstat_UdpLite_InDatagrams|node_netstat_UdpLite_OutDatagrams|node_netstat_UdpLite_InCsumErrors|node_netstat_UdpLite_InErrors|node_netstat_UdpLite_RcvbufErrors|node_netstat_UdpLite_SndbufErrors|node_netstat_UdpLite_NoPorts|node_netstat_Icmp_InErrors|node_netstat_Icmp_OutErrors|node_netstat_Icmp_InDestUnreachs|node_netstat_Icmp_OutDestUnreachs|node_netstat_IcmpMsg_InType3|node_netstat_IcmpMsg_OutType3|node_netstat_Icmp_InCsumErrors|node_netstat_Icmp_InTimeExcds|node_netstat_Icmp_InMsgs|node_netstat_Icmp_InRedirects|node_netstat_Icmp_OutMsgs|node_netstat_Icmp_OutRedirects|node_netstat_Icmp_InEchoReps|node_netstat_Icmp_InEchos|node_netstat_Icmp_OutEchoReps|node_netstat_Icmp_OutEchos|node_netstat_Icmp_InAddrMaskReps|node_netstat_Icmp_OutAddrMasks|node_netstat_Icmp_InTimestamps|node_netstat_Icmp_OutTimestamps|node_netstat_Icmp_OutTimestampReps|node_netstat_Icmp_InTimestampReps|node_netstat_Icmp_InAddrMasks|node_netstat_Icmp_OutAddrMaskReps|node_netstat_Tcp_OutRsts|node_network_receive_packets|node_network_transmit_packets|node_network_receive_errs|node_network_transmit_errs|node_network_receive_drop|node_network_transmit_drop|node_network_receive_multicast|node_network_transmit_multicast|node_netstat_Tcp_InCsumErrors|node_netstat_Tcp_InErrs)",
+				Replacement:  "${1}_total",
+			},
+			{
+				SourceLabels: prometheusModel.LabelNames{"__name__"},
+				TargetLabel:  "__name__",
+				Regex:        "node_disk_bytes_read",
+				Replacement:  "node_disk_read_bytes_total",
+			},
+			{
+				SourceLabels: prometheusModel.LabelNames{"__name__"},
+				TargetLabel:  "__name__",
+				Regex:        "node_disk_bytes_written",
+				Replacement:  "node_disk_written_bytes_total",
+			},
+			{
+				SourceLabels: prometheusModel.LabelNames{"__name__"},
+				TargetLabel:  "__name__",
+				Regex:        "node_cpu",
+				Replacement:  "node_cpu_seconds_total",
+			},
+		},
 	}
 
 	nodes, err := q.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType)

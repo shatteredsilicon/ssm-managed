@@ -32,6 +32,7 @@ import (
 	"github.com/lib/pq"
 	servicelib "github.com/percona/kardianos-service"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/model"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/reform.v1"
@@ -112,6 +113,14 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 			TargetLabel: "job",
 			Replacement: "postgresql",
 		}},
+		MetricRelabelConfigs: []prometheus.RelabelConfig{
+			{
+				SourceLabels: []model.LabelName{"__name__"},
+				TargetLabel:  "__name__",
+				Regex:        "(pg_stat_database_xact_commit|pg_stat_database_xact_rollback|pg_stat_database_temp_bytes|pg_stat_database_deadlocks|pg_stat_database_conflicts|pg_stat_database_blk_read_time|pg_stat_database_blk_write_time|pg_stat_bgwriter_buffers_alloc|pg_stat_bgwriter_checkpoint_write_time|pg_stat_bgwriter_checkpoint_sync_time|pg_stat_database_conflicts_confl_tablespace|pg_stat_database_conflicts_confl_snapshot|pg_stat_database_conflicts_confl_lock|pg_stat_database_conflicts_confl_deadlock|pg_stat_database_conflicts_confl_bufferpin|pg_stat_bgwriter_buffers_checkpoint|pg_stat_bgwriter_buffers_clean|pg_stat_bgwriter_buffers_backend|pg_stat_bgwriter_buffers_backend_fsync|pg_stat_database_tup_fetched|pg_stat_database_tup_returned|pg_stat_database_tup_inserted|pg_stat_database_tup_updated|pg_stat_database_tup_deleted)",
+				Replacement:  "${1}_total",
+			},
+		},
 	}
 
 	nodes, err := q.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType)
