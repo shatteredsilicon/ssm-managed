@@ -117,6 +117,10 @@ func (s *NodeServer) putRemoteNodes(nodes []remote.FullInstance, respNodes []*ap
 
 func (s *NodeServer) putConsulNodes(nodes []node.ClientNode, respNodes []*api.NodeInstance) []*api.NodeInstance {
 	for _, node := range nodes {
+		if len(node.Services) == 0 {
+			continue
+		}
+
 		services := make([]*api.NodeInstanceService, len(node.Services))
 		for i, service := range node.Services {
 			services[i] = &api.NodeInstanceService{

@@ -151,6 +151,16 @@ func convertScrapeConfig(cfg *ScrapeConfig) (*config.ScrapeConfig, error) {
 		}
 	}
 
+	metricRelabelConfigs := make([]*config.RelabelConfig, len(cfg.MetricRelabelConfigs))
+	for i, rc := range cfg.MetricRelabelConfigs {
+		metricRelabelConfigs[i] = &config.RelabelConfig{
+			SourceLabels: rc.SourceLabels,
+			Regex:        config.MustNewRegexp(rc.Regex),
+			TargetLabel:  rc.TargetLabel,
+			Replacement:  rc.Replacement,
+		}
+	}
+
 	return &config.ScrapeConfig{
 		JobName:        cfg.JobName,
 		ScrapeInterval: interval,
@@ -168,7 +178,8 @@ func convertScrapeConfig(cfg *ScrapeConfig) (*config.ScrapeConfig, error) {
 		ServiceDiscoveryConfig: sd_config.ServiceDiscoveryConfig{
 			StaticConfigs: tg,
 		},
-		RelabelConfigs: relabelConfigs,
+		RelabelConfigs:       relabelConfigs,
+		MetricRelabelConfigs: metricRelabelConfigs,
 	}, nil
 }
 

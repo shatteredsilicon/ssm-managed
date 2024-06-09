@@ -53,6 +53,7 @@ type StaticConfig struct {
 
 type RelabelConfig struct {
 	SourceLabels model.LabelNames
+	Regex        string
 	TargetLabel  string
 	Replacement  string
 }
@@ -67,17 +68,18 @@ type TLSConfig struct {
 }
 
 type ScrapeConfig struct {
-	JobName        string
-	ScrapeInterval string
-	ScrapeTimeout  string
-	MetricsPath    string
-	HonorLabels    bool
-	Scheme         string
-	Params         url.Values
-	BasicAuth      *BasicAuth
-	TLSConfig      TLSConfig
-	StaticConfigs  []StaticConfig
-	RelabelConfigs []RelabelConfig
+	JobName              string
+	ScrapeInterval       string
+	ScrapeTimeout        string
+	MetricsPath          string
+	HonorLabels          bool
+	Scheme               string
+	Params               url.Values
+	BasicAuth            *BasicAuth
+	TLSConfig            TLSConfig
+	StaticConfigs        []StaticConfig
+	RelabelConfigs       []RelabelConfig
+	MetricRelabelConfigs []RelabelConfig
 }
 
 // Health of the target.
