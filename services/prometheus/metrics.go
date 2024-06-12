@@ -56,7 +56,9 @@ type TargetActiveTarget struct {
 		Instance string `json:"instance"`
 		Job      string `json:"job"`
 	} `json:"labels"`
-	ScrapePool string `json:"scrapePool"`
+	ScrapePool     string `json:"scrapePool"`
+	LastScrape     string `json:"lastScrape"`
+	ScrapeInterval string `json:"scrapeInterval"`
 }
 
 // TargetData data structure of prometheus GET targets api
@@ -72,9 +74,16 @@ type TargetResponse struct {
 
 // NodeService service of node
 type NodeService struct {
-	Name     string
-	Type     models.AgentType
-	Endpoint string
+	Name           string
+	Type           models.AgentType
+	Endpoint       string
+	now            time.Time
+	lastScrape     time.Time
+	scrapeInterval time.Duration
+}
+
+func (ns NodeService) IsActive() bool {
+	return !ns.lastScrape.IsZero() && ns.now.Sub(ns.lastScrape) < 2*ns.scrapeInterval
 }
 
 // GetNodeServices returns services of ndoe
@@ -123,11 +132,16 @@ func (svc *Service) GetNodeServices(ctx context.Context) ([]NodeService, error) 
 			}
 		}
 
+		lastScrape, _ := time.Parse(time.RFC3339, target.LastScrape)
+		scrapeInterval, _ := time.ParseDuration(target.ScrapeInterval)
 		if !exists {
 			services = append(services, NodeService{
-				Name:     target.Labels.Instance,
-				Type:     agentType,
-				Endpoint: target.DiscoveredLabels.Address,
+				Name:           target.Labels.Instance,
+				Type:           agentType,
+				Endpoint:       target.DiscoveredLabels.Address,
+				lastScrape:     lastScrape,
+				scrapeInterval: scrapeInterval,
+				now:            time.Now(),
 			})
 		}
 	}
@@ -178,7 +192,7 @@ func (svc *Service) RemoveNode(ctx context.Context, nodeID string) error {
 		}
 
 		for _, target := range activeTargets {
-			if string(target.Name) == nodeName { // service has been re-added
+			if string(target.Name) == nodeName && target.IsActive() { // service has been re-added
 				return nil
 			}
 		}

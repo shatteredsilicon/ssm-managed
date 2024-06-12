@@ -198,7 +198,7 @@ func (svc *Service) removeServiceFromPrometheus(ctx context.Context, nodeName, s
 			if target.Name == nodeName {
 				nodeTargets++
 			}
-			if target.Name == nodeName && string(target.Type) == service { // service has been re-added
+			if target.Name == nodeName && string(target.Type) == service && target.IsActive() { // service has been re-added
 				reAdded = true
 			}
 		}
@@ -543,7 +543,7 @@ func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error 
 			continue
 		}
 
-		if node.OSName == string(models.SSMServerNodeType) {
+		if node.Name == string(models.SSMServerNodeType) {
 			continue
 		}
 
