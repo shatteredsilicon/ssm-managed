@@ -282,11 +282,6 @@ func removeInternalQan(ctx context.Context, deps *serviceDependencies) error {
 		return err
 	}
 
-	err = deps.qan.RemoveQANData(ctx, agentService.QanDBInstanceUUID)
-	if err != nil {
-		return err
-	}
-
 	return deps.db.InTransaction(func(tx *reform.TX) error {
 		_, err = tx.DeleteFrom(models.AgentServiceView, "WHERE agent_id = ?", agentService.AgentID)
 		if err != nil {
