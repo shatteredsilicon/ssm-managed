@@ -170,7 +170,7 @@ func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor strin
 }
 
 // Restore ensures that agent is registered and running.
-func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent models.QanAgent, collectFrom string) error {
+func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent models.QanAgent, config config.QAN) error {
 	l := logger.Get(ctx).WithField("component", "qan")
 
 	qanURL, err := getQanURL(ctx)
@@ -190,12 +190,13 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 	}
 
 	command := "StartTool"
-	exampleQueries := true
-	config := config.QAN{
-		UUID:           dbInstance.UUID,
-		CollectFrom:    collectFrom,
-		Interval:       60,
-		ExampleQueries: &exampleQueries,
+	config.UUID = dbInstance.UUID
+	if config.ExampleQueries == nil {
+		exampleQueries := true
+		config.ExampleQueries = &exampleQueries
+	}
+	if config.Interval == 0 {
+		config.Interval = 60
 	}
 	if os.Getenv("QAN_FILTER_OMIT") != "" {
 		config.FilterOmit = strings.Split(os.Getenv("QAN_FILTER_OMIT"), ",")

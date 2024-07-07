@@ -183,21 +183,43 @@ func makePortsRegistry(db *reform.DB) (*ports.Registry, error) {
 
 func makeInternalQan(ctx context.Context, deps *serviceDependencies) error {
 	var nodeID int32
+	qanConfig := pc.QAN{
+		CollectFrom: qan.SlowlogCollectFrom,
+		FilterAllow: []string{"SELECT", "DELETE"},
+	}
 
-	agentService, err := models.AgentServiceByName(deps.db.Querier, models.SSMServerNodeName, string(models.QanAgentAgentType))
+	var node models.Node
+	err := deps.db.FindOneTo(&node, "type", models.SSMServerNodeType)
 	if err != nil {
 		return err
 	}
-	if agentService == nil {
-		var node models.Node
-		err := deps.db.FindOneTo(&node, "type", models.SSMServerNodeType)
-		if err != nil {
-			return err
+	nodeID = node.ID
+
+	var service models.MySQLService
+	if err = deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", nodeID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
+		return errors.WithStack(err)
+	}
+
+	if service.ID != 0 { // internal qan already exists, restore it instead of creating it
+		var agent models.QanAgent
+		if err = deps.db.SelectOneTo(&agent, "WHERE runs_on_node_id = ? AND type = ?", nodeID, models.QanAgentAgentType); err != nil {
+			return errors.WithStack(err)
 		}
 
-		nodeID = node.ID
-	} else {
-		nodeID = agentService.NodeID
+		if agent.ListenPort == nil {
+			agent.ListenPort = pointer.ToUint16(models.QanAgentPort)
+		}
+
+		if err = deps.qan.Restore(
+			ctx,
+			models.NameForSupervisor(models.QanAgentAgentType, *agent.ListenPort),
+			agent,
+			qanConfig,
+		); err != nil {
+			return errors.WithStack(err)
+		}
+
+		return nil
 	}
 
 	var version, versionComment string
@@ -211,7 +233,7 @@ func makeInternalQan(ctx context.Context, deps *serviceDependencies) error {
 		return err
 	}
 
-	service := models.MySQLService{
+	service = models.MySQLService{
 		Type:          models.MySQLServiceType,
 		NodeID:        nodeID,
 		Address:       dbSocketF,
@@ -228,23 +250,15 @@ func makeInternalQan(ctx context.Context, deps *serviceDependencies) error {
 		ServicePassword: &servicePassword,
 		ListenPort:      pointer.ToUint16(models.QanAgentPort),
 	}
-
 	err = deps.qan.AddMySQL(
 		ctx,
 		string(models.SSMServerNodeType),
 		&service,
 		&agent,
-		pc.QAN{
-			CollectFrom: qan.SlowlogCollectFrom,
-			FilterAllow: []string{"SELECT", "DELETE"},
-		},
+		qanConfig,
 	)
 	if err != nil {
 		return err
-	}
-
-	if agentService != nil {
-		return nil
 	}
 
 	return deps.db.InTransaction(func(tx *reform.TX) error {
@@ -739,6 +753,13 @@ func main() {
 		portsRegistry: portsRegistry,
 	}
 
+	// restore all qan configs from database before
+	// restoring rds or remote mysql services
+	err = deps.qan.RestoreConfigs(ctx, deps.db.Querier)
+	if err != nil {
+		l.Panicf("Restore qan configs failed: %+v", err)
+	}
+
 	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
 		err = makeInternalQan(ctx, deps)
 		if err != nil {
@@ -749,13 +770,6 @@ func main() {
 		if err != nil {
 			l.Warnf("Failed to remove internal qan: %+v", err)
 		}
-	}
-
-	// restore all qan configs from database before
-	// restoring rds or remote mysql services
-	err = deps.qan.RestoreConfigs(ctx, deps.db.Querier)
-	if err != nil {
-		l.Panicf("Restore qan configs failed: %+v", err)
 	}
 
 	rds, err := makeRDSService(ctx, deps)
