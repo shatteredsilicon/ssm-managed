@@ -654,7 +654,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						}
 					}
 
-					if err = svc.QAN.Restore(ctx, name, a, qan.PerfschemaCollectFrom); err != nil {
+					if err = svc.QAN.Restore(ctx, name, a, config.QAN{CollectFrom: qan.PerfschemaCollectFrom}); err != nil {
 						return err
 					}
 				}
