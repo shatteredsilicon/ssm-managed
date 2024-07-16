@@ -116,14 +116,14 @@ var databaseSchema = [][]string{
 	},
 }
 
-func OpenDB(name, username, password string, logf reform.Printf) (*sql.DB, error) {
+func OpenDB(net, addr, name, username, password string, logf reform.Printf) (*sql.DB, error) {
 	cfg := mysql.NewConfig()
 	cfg.User = username
 	cfg.Passwd = password
 	cfg.DBName = name
 
-	cfg.Net = "tcp"
-	cfg.Addr = "127.0.0.1:3306"
+	cfg.Net = net
+	cfg.Addr = addr
 
 	// required for reform
 	cfg.ClientFoundRows = true
