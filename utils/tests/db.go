@@ -28,7 +28,7 @@ import (
 func OpenTestDB(t testing.TB) *sql.DB {
 	t.Helper()
 
-	db, err := models.OpenDB("", "ssm-managed", "ssm-managed", t.Logf)
+	db, err := models.OpenDB("unix", "/var/lib/mysql/mysql.sock", "", "ssm-managed", "ssm-managed", t.Logf)
 	require.NoError(t, err)
 
 	const testDatabase = "ssm-managed-dev"
@@ -39,7 +39,7 @@ func OpenTestDB(t testing.TB) *sql.DB {
 
 	db.Close()
 
-	db, err = models.OpenDB(testDatabase, "ssm-managed", "ssm-managed", t.Logf)
+	db, err = models.OpenDB("unix", "/var/lib/mysql/mysql.sock", testDatabase, "ssm-managed", "ssm-managed", t.Logf)
 	require.NoError(t, err)
 	return db
 }

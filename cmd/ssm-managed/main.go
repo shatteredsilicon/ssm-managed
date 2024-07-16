@@ -733,7 +733,7 @@ func main() {
 		l.Panicf("QAN service problem: %+v", err)
 	}
 
-	sqlDB, err := models.OpenDB(*dbNameF, *dbUsernameF, *dbPasswordF, l.Debugf)
+	sqlDB, err := models.OpenDB("unix", *dbSocketF, *dbNameF, *dbUsernameF, *dbPasswordF, l.Debugf)
 	if err != nil {
 		l.Panic(err)
 	}
