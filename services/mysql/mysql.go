@@ -161,7 +161,7 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		},
 	}
 
-	nodes, err := q.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType)
+	nodes, err := q.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType, models.SSMServerNodeType)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -193,12 +193,21 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 				}
 				logger.Get(ctx).WithField("component", "mysql").Infof("%s %s %s %d", a.Type, node.Name, node.Region, *a.ListenPort)
 
-				sc := prometheus.StaticConfig{
-					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
-					Labels: []prometheus.LabelPair{
+				var labels []prometheus.LabelPair
+				if node.Type == models.SSMServerNodeType {
+					labels = []prometheus.LabelPair{
+						{Name: "instance", Value: string(node.Type)}, // ssm-server node uses type as name
+					}
+				} else {
+					labels = []prometheus.LabelPair{
 						{Name: "instance", Value: node.Name},
 						{Name: "region", Value: string(models.RemoteNodeRegion)},
-					},
+					}
+				}
+
+				sc := prometheus.StaticConfig{
+					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
+					Labels:  labels,
 				}
 				mySQLHR.StaticConfigs = append(mySQLHR.StaticConfigs, sc)
 				mySQLMR.StaticConfigs = append(mySQLMR.StaticConfigs, sc)
@@ -350,7 +359,14 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 	}
 }
 
-func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *models.MySQLService, node *models.RemoteNode, username, password string) error {
+func (svc *Service) addQanAgent(
+	ctx context.Context,
+	tx *reform.TX,
+	service *models.MySQLService,
+	node *models.RemoteNode,
+	username, password string,
+	qanConfig *config.QAN,
+) error {
 	// Despite running a single qan-agent process on PMM Server, we use one database record per MySQL instance
 	// to store username/password and UUID.
 
@@ -376,7 +392,15 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
-		if err = svc.QAN.AddMySQL(ctx, node.Name, service, agent, config.QAN{CollectFrom: qan.PerfschemaCollectFrom}); err != nil {
+		if qanConfig == nil {
+			qanConfig = &config.QAN{CollectFrom: qan.PerfschemaCollectFrom}
+		}
+
+		nodeName := node.Name
+		if node.Type == models.SSMServerNodeType {
+			nodeName = string(node.Type) // ssm-server node uses type as name
+		}
+		if err = svc.QAN.AddMySQL(ctx, nodeName, service, agent, *qanConfig); err != nil {
 			return err
 		}
 
@@ -389,7 +413,15 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	return nil
 }
 
-func (svc *Service) Add(ctx context.Context, name, address string, port uint32, username, password string) (int32, error) {
+func (svc *Service) Add(
+	ctx context.Context,
+	name, address string,
+	port uint32,
+	username, password string,
+	nodeType models.NodeType,
+	region string,
+	qanConfig *config.QAN,
+) (int32, error) {
 	address = strings.TrimSpace(address)
 	username = strings.TrimSpace(username)
 	name = strings.TrimSpace(name)
@@ -419,16 +451,16 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 	err = svc.DB.InTransaction(func(tx *reform.TX) error {
 		// insert node
 		node := &models.RemoteNode{
-			Type:   models.RemoteNodeType,
+			Type:   nodeType,
 			Name:   name,
-			Region: string(models.RemoteNodeRegion),
+			Region: region,
 		}
 		if err := tx.Insert(node); err != nil {
 			if err, ok := err.(*mysql.MySQLError); !ok || err.Number != 0x426 {
 				return errors.WithStack(err)
 			}
 
-			err = tx.SelectOneTo(node, "WHERE type = ? AND name = ? AND region = ?", models.RemoteNodeType, name, string(models.RemoteNodeRegion))
+			err = tx.SelectOneTo(node, "WHERE type = ? AND name = ? AND region = ?", nodeType, name, region)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -457,7 +489,7 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 		if err = svc.addMySQLdExporter(ctx, tx, service, username, password); err != nil {
 			return err
 		}
-		if err = svc.addQanAgent(ctx, tx, service, node, username, password); err != nil {
+		if err = svc.addQanAgent(ctx, tx, service, node, username, password, qanConfig); err != nil {
 			return err
 		}
 
@@ -493,7 +525,11 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 	var err error
 	return svc.DB.InTransaction(func(tx *reform.TX) error {
 		var node models.RemoteNode
-		if err = tx.SelectOneTo(&node, "WHERE type = ? AND id = ?", models.RemoteNodeType, id); err != nil {
+		if err = tx.SelectOneTo(
+			&node,
+			"WHERE ( type = ? OR type = ? ) AND id = ?",
+			models.RemoteNodeType, models.SSMServerNodeType, id,
+		); err != nil {
 			if err == reform.ErrNoRows {
 				return status.Errorf(codes.NotFound, "MySQL instance with ID %d not found.", id)
 			}
@@ -581,8 +617,11 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 		if err = tx.Delete(&service); err != nil {
 			return errors.WithStack(err)
 		}
-		if err = tx.Delete(&node); err != nil {
-			return errors.WithStack(err)
+
+		if node.Type != models.SSMServerNodeType {
+			if err = tx.Delete(&node); err != nil {
+				return errors.WithStack(err)
+			}
 		}
 
 		return svc.ApplyPrometheusConfiguration(ctx, tx.Querier)
@@ -591,7 +630,7 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 
 // Restore configuration from database.
 func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
-	nodes, err := tx.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType)
+	nodes, err := tx.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType, models.SSMServerNodeType)
 	if err != nil {
 		return errors.WithStack(err)
 	}
