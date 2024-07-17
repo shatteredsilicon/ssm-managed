@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/shatteredsilicon/ssm-managed/api"
+	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
@@ -57,7 +58,17 @@ func (s *MySQLServer) List(ctx context.Context, req *api.MySQLListRequest) (*api
 // Add adds new MySQL instance.
 func (s *MySQLServer) Add(ctx context.Context, req *api.MySQLAddRequest) (*api.MySQLAddResponse, error) {
 
-	id, err := s.MySQL.Add(ctx, req.Name, req.Address, req.Port, req.Username, req.Password)
+	id, err := s.MySQL.Add(
+		ctx,
+		req.Name,
+		req.Address,
+		req.Port,
+		req.Username,
+		req.Password,
+		models.RemoteNodeType,
+		string(models.RemoteNodeRegion),
+		nil,
+	)
 	if err != nil {
 		logger.Get(ctx).Errorf("%+v", err)
 		return nil, err

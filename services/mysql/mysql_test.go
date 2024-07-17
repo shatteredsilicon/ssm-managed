@@ -175,19 +175,19 @@ func TestAddListRemove(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, actual)
 
-	_, err = svc.Add(ctx, "", "", 0, "username", "password")
+	_, err = svc.Add(ctx, "", "", 0, "username", "password", models.RemoteNodeType, string(models.RemoteNodeRegion), nil)
 	tests.AssertGRPCError(t, status.New(codes.InvalidArgument, `MySQL instance host is not given.`), err)
 
-	_, err = svc.Add(ctx, "", " ", 0, "username", "password")
+	_, err = svc.Add(ctx, "", " ", 0, "username", "password", models.RemoteNodeType, string(models.RemoteNodeRegion), nil)
 	tests.AssertGRPCError(t, status.New(codes.InvalidArgument, `MySQL instance host is not given.`), err)
 
 	supervisor.On("Start", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Status", mock.Anything, mock.Anything).Return(fmt.Errorf("not running"))
 	supervisor.On("Stop", mock.Anything, mock.Anything).Return(nil)
-	id, err := svc.Add(ctx, "", "localhost", 0, "ssm-managed", "ssm-managed")
+	id, err := svc.Add(ctx, "", "localhost", 0, "ssm-managed", "ssm-managed", models.RemoteNodeType, string(models.RemoteNodeRegion), nil)
 	assert.NoError(t, err)
 
-	_, err = svc.Add(ctx, "", "localhost", 3306, "ssm-managed", "ssm-managed")
+	_, err = svc.Add(ctx, "", "localhost", 3306, "ssm-managed", "ssm-managed", models.RemoteNodeType, string(models.RemoteNodeRegion), nil)
 	tests.AssertGRPCError(t, status.New(codes.AlreadyExists, `MySQL instance "localhost" already exists.`), err)
 
 	actual, err = svc.List(ctx)
@@ -242,7 +242,7 @@ func TestRestore(t *testing.T) {
 	supervisor.On("Start", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Status", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Stop", mock.Anything, mock.Anything).Return(nil)
-	_, err = svc.Add(ctx, "", "localhost", 3306, "pmm-managed", "pmm-managed")
+	_, err = svc.Add(ctx, "", "localhost", 3306, "ssm-managed", "ssm-managed", models.RemoteNodeType, string(models.RemoteNodeRegion), nil)
 	assert.NoError(t, err)
 
 	// Restore should succeed.

@@ -94,8 +94,16 @@ func (m *MySQLdExporter) DSN(service *MySQLService) string {
 	cfg.User = *m.ServiceUsername
 	cfg.Passwd = *m.ServicePassword
 
-	cfg.Net = "tcp"
-	cfg.Addr = net.JoinHostPort(*service.Address, strconv.Itoa(int(*service.Port)))
+	if _, err := os.Stat(*service.Address); err == nil {
+		// check if address is a valid filepath and
+		// if that file exists, if so assume that it's
+		// a unix socket
+		cfg.Net = "unix"
+		cfg.Addr = *service.Address
+	} else {
+		cfg.Net = "tcp"
+		cfg.Addr = net.JoinHostPort(*service.Address, strconv.Itoa(int(*service.Port)))
+	}
 
 	cfg.Timeout = sqlDialTimeout
 

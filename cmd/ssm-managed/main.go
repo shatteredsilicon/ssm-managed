@@ -34,7 +34,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/AlekSi/pointer"
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
@@ -181,135 +180,58 @@ func makePortsRegistry(db *reform.DB) (*ports.Registry, error) {
 	return registry, err
 }
 
-func makeInternalQan(ctx context.Context, deps *serviceDependencies) error {
-	var nodeID int32
-	qanConfig := pc.QAN{
-		CollectFrom: qan.SlowlogCollectFrom,
-		FilterAllow: []string{"SELECT", "DELETE"},
-	}
-
+func makeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSvc *mysql.Service) error {
 	var node models.Node
 	err := deps.db.FindOneTo(&node, "type", models.SSMServerNodeType)
 	if err != nil {
 		return err
 	}
-	nodeID = node.ID
 
 	var service models.MySQLService
-	if err = deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", nodeID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
+	if err = deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", node.ID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
 		return errors.WithStack(err)
 	}
 
-	if service.ID != 0 { // internal qan already exists, restore it instead of creating it
-		var agent models.QanAgent
-		if err = deps.db.SelectOneTo(&agent, "WHERE runs_on_node_id = ? AND type = ?", nodeID, models.QanAgentAgentType); err != nil {
-			return errors.WithStack(err)
-		}
-
-		if agent.ListenPort == nil {
-			agent.ListenPort = pointer.ToUint16(models.QanAgentPort)
-		}
-
-		if err = deps.qan.Restore(
-			ctx,
-			models.NameForSupervisor(models.QanAgentAgentType, *agent.ListenPort),
-			agent,
-			qanConfig,
-		); err != nil {
-			return errors.WithStack(err)
-		}
-
+	if service.ID != 0 {
+		// internal mysql service already exists
 		return nil
 	}
 
-	var version, versionComment string
-	err = deps.db.QueryRowContext(ctx, "SELECT @@version, @@version_comment").Scan(&version, &versionComment)
-	if err != nil {
-		return err
-	}
-
-	engine, engineVersion, err := mysql.NormalizeEngineAndEngineVersion(versionComment, version)
-	if err != nil {
-		return err
-	}
-
-	service = models.MySQLService{
-		Type:          models.MySQLServiceType,
-		NodeID:        nodeID,
-		Address:       dbSocketF,
-		Engine:        &engine,
-		EngineVersion: &engineVersion,
-	}
-
-	serviceUsername := "root"
-	servicePassword := ""
-	agent := models.QanAgent{
-		Type:            models.QanAgentAgentType,
-		RunsOnNodeID:    nodeID,
-		ServiceUsername: &serviceUsername,
-		ServicePassword: &servicePassword,
-		ListenPort:      pointer.ToUint16(models.QanAgentPort),
-	}
-	err = deps.qan.AddMySQL(
+	_, err = mysqlSvc.Add(
 		ctx,
-		string(models.SSMServerNodeType),
-		&service,
-		&agent,
-		qanConfig,
+		models.SSMServerNodeName,
+		*dbSocketF,
+		0,
+		*dbUsernameF,
+		*dbPasswordF,
+		models.SSMServerNodeType,
+		"",
+		&pc.QAN{
+			CollectFrom: qan.SlowlogCollectFrom,
+			FilterAllow: []string{"SELECT", "DELETE"},
+		},
 	)
-	if err != nil {
-		return err
-	}
-
-	return deps.db.InTransaction(func(tx *reform.TX) error {
-		if err = tx.Insert(&service); err != nil {
-			return err
-		}
-
-		if err = tx.Insert(&agent); err != nil {
-			return err
-		}
-
-		return tx.Insert(&models.AgentService{AgentID: agent.ID, ServiceID: service.ID})
-	})
+	return errors.WithStack(err)
 }
 
-func removeInternalQan(ctx context.Context, deps *serviceDependencies) error {
-	agentService, err := models.AgentServiceByName(deps.db.Querier, models.SSMServerNodeName, string(models.QanAgentAgentType))
+func removeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSvc *mysql.Service) error {
+	var node models.Node
+	err := deps.db.FindOneTo(&node, "type", models.SSMServerNodeType)
 	if err != nil {
 		return err
 	}
 
-	if agentService == nil {
+	var service models.MySQLService
+	if err = deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", node.ID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
+		return errors.WithStack(err)
+	}
+
+	if service.ID == 0 {
+		// internal mysql service doesn't exists
 		return nil
 	}
 
-	agent := models.QanAgent{
-		Type:              models.QanAgentAgentType,
-		RunsOnNodeID:      agentService.NodeID,
-		ListenPort:        pointer.ToUint16(models.QanAgentPort),
-		QANDBInstanceUUID: &agentService.QanDBInstanceUUID,
-	}
-
-	err = deps.qan.RemoveMySQL(ctx, &agent)
-	if err != nil {
-		return err
-	}
-
-	return deps.db.InTransaction(func(tx *reform.TX) error {
-		_, err = tx.DeleteFrom(models.AgentServiceView, "WHERE agent_id = ?", agentService.AgentID)
-		if err != nil {
-			return err
-		}
-
-		_, err = tx.DeleteFrom(models.AgentTable, "WHERE id = ?", agentService.AgentID)
-		if err != nil {
-			return err
-		}
-
-		_, err = tx.DeleteFrom(models.ServiceTable, "WHERE id = ?", agentService.ServiceID)
-		return err
-	})
+	return mysqlSvc.Remove(ctx, node.ID)
 }
 
 type serviceDependencies struct {
@@ -760,18 +682,6 @@ func main() {
 		l.Panicf("Restore qan configs failed: %+v", err)
 	}
 
-	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
-		err = makeInternalQan(ctx, deps)
-		if err != nil {
-			l.Panicf("Failed to add internal qan: %+v", err)
-		}
-	} else {
-		err = removeInternalQan(ctx, deps)
-		if err != nil {
-			l.Warnf("Failed to remove internal qan: %+v", err)
-		}
-	}
-
 	rds, err := makeRDSService(ctx, deps)
 	if err != nil {
 		l.Panicf("RDS service problem: %+v", err)
@@ -780,6 +690,18 @@ func main() {
 	mysqlService, err := makeMySQLService(ctx, deps, consulClient)
 	if err != nil {
 		l.Panicf("MySQL service problem: %+v", err)
+	}
+
+	if os.Getenv("DEBUG") == "1" || os.Getenv("DEBUG") == "true" {
+		err = makeInternalService(ctx, deps, mysqlService)
+		if err != nil {
+			l.Panicf("Failed to add internal qan: %+v", err)
+		}
+	} else {
+		err = removeInternalService(ctx, deps, mysqlService)
+		if err != nil {
+			l.Warnf("Failed to remove internal qan: %+v", err)
+		}
 	}
 
 	postgres, err := makePostgreSQLService(ctx, deps, consulClient)
