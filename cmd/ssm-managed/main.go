@@ -99,6 +99,9 @@ var (
 	dbSocketF     = flag.String("db-socket", "/var/lib/mysql/mysql.sock", "Database socket")
 	qanAPIConfigF = flag.String("qan-api-config", "/etc/ssm-qan-api.conf", "QAN configuration file path")
 
+	internalDBUserF     = flag.String("internal-db-username", "ssm", "Database username for internal QAN/metric service")
+	internalDBPasswordF = flag.String("internal-db-password", "ssm", "Database password for internal QAN/metric service")
+
 	agentMySQLdExporterF    = flag.String("agent-mysqld-exporter", "/opt/ss/ssm-client/mysqld_exporter", "mysqld_exporter path")
 	agentPostgresExporterF  = flag.String("agent-postgres-exporter", "/opt/ss/ssm-client/postgres_exporter", "postgres_exporter path")
 	agentRDSExporterF       = flag.String("agent-rds-exporter", "/usr/sbin/rds_exporter", "rds_exporter path")
@@ -202,8 +205,8 @@ func makeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSv
 		models.SSMServerNodeName,
 		*dbSocketF,
 		0,
-		*dbUsernameF,
-		*dbPasswordF,
+		*internalDBUserF,
+		*internalDBPasswordF,
 		models.SSMServerNodeType,
 		"",
 		&pc.QAN{
