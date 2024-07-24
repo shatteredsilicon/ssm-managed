@@ -922,7 +922,7 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 				}
 				if svc.QAN != nil {
 					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-					if err = svc.QAN.RemoveMySQL(ctx, &a); err != nil {
+					if err = svc.QAN.RemoveMySQL(ctx, &a, false); err != nil {
 						return err
 					}
 				}

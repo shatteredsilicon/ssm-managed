@@ -707,7 +707,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	return svc.sendQANCommand(ctx, qanURL, agentUUID, command, b)
 }
 
-func (svc *Service) RemoveMySQL(ctx context.Context, qanAgent *models.QanAgent) error {
+func (svc *Service) RemoveMySQL(ctx context.Context, qanAgent *models.QanAgent, softRemove bool) error {
 	qanURL, err := svc.ensureAgentIsRegistered(ctx)
 	if err != nil {
 		return err
@@ -725,6 +725,15 @@ func (svc *Service) RemoveMySQL(ctx context.Context, qanAgent *models.QanAgent) 
 
 	command := "StopTool"
 	b := []byte(*qanAgent.QANDBInstanceUUID)
+	if softRemove {
+		b, _ = json.Marshal(struct {
+			UUID       string `json:"uuid"`
+			SoftRemove bool   `json:"soft_remove"`
+		}{
+			UUID:       *qanAgent.QANDBInstanceUUID,
+			SoftRemove: true,
+		})
+	}
 	logger.Get(ctx).WithField("component", "qan").Debugf("%s %s %s", agentUUID, command, b)
 
 	if err = svc.sendQANCommand(ctx, qanURL, agentUUID, command, b); err != nil {
