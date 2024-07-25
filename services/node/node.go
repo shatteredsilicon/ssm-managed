@@ -480,7 +480,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			}
 			if svc.qan != nil {
 				<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-				if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
+				if err = svc.qan.RemoveMySQL(ctx, &a, false); err != nil {
 					return err
 				}
 			}
@@ -690,7 +690,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 				}
 				if svc.qan != nil {
 					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-					if err = svc.qan.RemoveMySQL(ctx, &a); err != nil {
+					if err = svc.qan.RemoveMySQL(ctx, &a, false); err != nil {
 						return err
 					}
 				}

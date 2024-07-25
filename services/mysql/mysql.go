@@ -600,7 +600,12 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 					return errors.WithStack(err)
 				}
 				if svc.QAN != nil {
-					if err = svc.QAN.RemoveMySQL(ctx, &a); err != nil {
+					if node.Type == models.SSMServerNodeType {
+						err = svc.QAN.RemoveMySQL(ctx, &a, true)
+					} else {
+						err = svc.QAN.RemoveMySQL(ctx, &a, false)
+					}
+					if err != nil {
 						return err
 					}
 				}
