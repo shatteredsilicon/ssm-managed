@@ -32,6 +32,7 @@ import (
 	servicelib "github.com/percona/kardianos-service"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/reform.v1"
@@ -699,6 +700,15 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					}
 
 					if err = svc.QAN.Restore(ctx, name, a, config.QAN{CollectFrom: qan.PerfschemaCollectFrom}); err != nil {
+						if _, ok := err.(qan.QANCommandError); ok {
+							// if it's a QAN command error, we should have already
+							// restored the qan configs (although may not be perfectly),
+							// one should check what happens on the qan-agent side, ssm-managed
+							// should just continue on.
+							logrus.WithField("component", "rds").Warnf("Got a QAN API error when restoring qan for %s: %s\n", node.Name, err.Error())
+							return nil
+						}
+
 						return err
 					}
 				}

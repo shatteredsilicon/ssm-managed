@@ -64,6 +64,9 @@ const (
 	SubsystemMongo
 )
 
+// QANCommandError for errors returned by QAN API
+type QANCommandError error
+
 // zero time of QAN database
 var qanDeletedTimeZero = time.Unix(1, 0)
 
@@ -209,7 +212,7 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 
 	l.Infof("%s %s %s", agentInstance.UUID, command, b)
 
-	return svc.sendQANCommand(ctx, qanURL, agentInstance.UUID, command, b)
+	return QANCommandError(svc.sendQANCommand(ctx, qanURL, agentInstance.UUID, command, b))
 }
 
 // RestoreConfigs restore all configs from QAN API
