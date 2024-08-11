@@ -44,7 +44,6 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
-	"gopkg.in/reform.v1"
 )
 
 const (
@@ -173,16 +172,10 @@ func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor strin
 }
 
 // Restore ensures that agent is registered and running.
-func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent models.QanAgent, config config.QAN) error {
+func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent models.QanAgent) error {
 	l := logger.Get(ctx).WithField("component", "qan")
 
-	qanURL, err := getQanURL(ctx)
-	if err != nil {
-		l.Infof("getQanURL err: %v", err)
-		return err
-	}
-
-	agentInstance, dbInstance, err := svc.restoreConfigs(ctx, models.QanAgentWithServiceType{QanAgent: agent})
+	_, _, err := svc.restoreConfigs(ctx, models.QanAgentWithServiceType{QanAgent: agent})
 	if err != nil {
 		l.Infof("restoreConfigs err: %v", err)
 		return err
@@ -190,47 +183,6 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 
 	if err := svc.ensureAgentRuns(ctx, nameForSupervisor, *agent.ListenPort); err != nil {
 		return errors.WithStack(err)
-	}
-
-	command := "StartTool"
-	config.UUID = dbInstance.UUID
-	if config.ExampleQueries == nil {
-		exampleQueries := true
-		config.ExampleQueries = &exampleQueries
-	}
-	if config.Interval == 0 {
-		config.Interval = 60
-	}
-	if os.Getenv("QAN_FILTER_OMIT") != "" {
-		config.FilterOmit = strings.Split(os.Getenv("QAN_FILTER_OMIT"), ",")
-	}
-
-	b, err := json.Marshal(config)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	l.Infof("%s %s %s", agentInstance.UUID, command, b)
-
-	return QANCommandError(svc.sendQANCommand(ctx, qanURL, agentInstance.UUID, command, b))
-}
-
-// RestoreConfigs restore all configs from QAN API
-func (svc *Service) RestoreConfigs(ctx context.Context, q *reform.Querier) error {
-	l := logger.Get(ctx).WithField("component", "qan")
-
-	agents, err := models.QanAgentsRunOnServer(q)
-	if err != nil {
-		l.Errorf("get qan agents from db failed: %+v", err)
-		return err
-	}
-
-	for _, agent := range agents {
-		_, _, err = svc.restoreConfigs(ctx, agent)
-		if err != nil {
-			l.Errorf("restore qan config for %d failed: %+v", agent.ID, err)
-			return err
-		}
 	}
 
 	return nil
@@ -293,7 +245,7 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 			return nil, nil, errors.WithStack(err)
 		}
 
-		if err = ioutil.WriteFile(path, dbInstanceJSON, 0666); err != nil {
+		if err = os.WriteFile(path, dbInstanceJSON, 0666); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to write %s", path)
 		}
 
@@ -309,7 +261,7 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 			return nil, nil, errors.WithStack(err)
 		}
 
-		if err = ioutil.WriteFile(path, osInstanceJSON, 0666); err != nil {
+		if err = os.WriteFile(path, osInstanceJSON, 0666); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to write %s", path)
 		}
 
@@ -325,7 +277,7 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 			return nil, nil, errors.WithStack(err)
 		}
 
-		if err = ioutil.WriteFile(path, agentInstanceJSON, 0666); err != nil {
+		if err = os.WriteFile(path, agentInstanceJSON, 0666); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to write %s", path)
 		}
 
@@ -366,7 +318,7 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 			return nil, nil, errors.Wrap(err, "failed to Marshal agent.conf")
 		}
 
-		if err = ioutil.WriteFile(path, b, 0666); err != nil {
+		if err = os.WriteFile(path, b, 0666); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to write agent.conf")
 		}
 
@@ -375,7 +327,7 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 
 	path = filepath.Join(svc.baseDir, "config", "log.conf")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err = ioutil.WriteFile(path, []byte(`{"Level":"info","Offline":"false"}`), 0666); err != nil {
+		if err = os.WriteFile(path, []byte(`{"Level":"info","Offline":"false"}`), 0666); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to write %s", path)
 		}
 
@@ -384,21 +336,12 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 
 	path = filepath.Join(svc.baseDir, "config", fmt.Sprintf("qan-%s.conf", dbInstance.UUID))
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		qanConf := fmt.Sprintf(`{ "UUID": "%s", "CollectFrom": "%s", "Interval": 60, "ExampleQueries": true }`, dbInstance.UUID, PerfschemaCollectFrom)
-		if agent.ServiceType == string(models.RDSServiceType) {
-			qanConf = fmt.Sprintf(`{ "UUID": "%s", "CollectFrom": "%s", "Interval": 60, "ExampleQueries": true }`, dbInstance.UUID, RDSSlowlogCollectFrom)
-		}
-
 		qanConfig, err := svc.getQANConfig(ctx, qanURL, dbInstance.UUID)
-		if err != nil {
+		if err != nil || qanConfig == nil {
 			return nil, nil, errors.Wrap(err, "failed to get qan config from QAN API")
 		}
-		if qanConfig != nil {
-			confBytes, _ := json.Marshal(qanConfig)
-			qanConf = string(confBytes)
-		}
 
-		if err = ioutil.WriteFile(path, []byte(qanConf), 0666); err != nil {
+		if err = os.WriteFile(path, []byte(qanConfig.RunningConfig), 0666); err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to write %s", path)
 		}
 

@@ -1051,7 +1051,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					}
 
 					// Installs new version of the script.
-					if err = svc.QAN.Restore(ctx, name, a, config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}); err != nil {
+					if err = svc.QAN.Restore(ctx, name, a); err != nil {
 						if _, ok := err.(qan.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),
