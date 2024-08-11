@@ -678,13 +678,6 @@ func main() {
 		portsRegistry: portsRegistry,
 	}
 
-	// restore all qan configs from database before
-	// restoring rds or remote mysql services
-	err = deps.qan.RestoreConfigs(ctx, deps.db.Querier)
-	if err != nil {
-		l.Panicf("Restore qan configs failed: %+v", err)
-	}
-
 	rds, err := makeRDSService(ctx, deps)
 	if err != nil {
 		l.Panicf("RDS service problem: %+v", err)
