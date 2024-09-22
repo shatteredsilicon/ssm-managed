@@ -123,7 +123,7 @@ func convertServiceScrapeTargetHealth(health *prometheus.ScrapeTargetHealth) *ap
 
 // List returns all scrape configs.
 func (s *ScrapeConfigsServer) List(ctx context.Context, req *api.ScrapeConfigsListRequest) (*api.ScrapeConfigsListResponse, error) {
-	cfgs, health, err := s.Prometheus.ListScrapeConfigs(ctx)
+	cfgs, health, err := s.Prometheus.ListScrapeConfigs(ctx, req.Instances...)
 	if err != nil {
 		return nil, err
 	}

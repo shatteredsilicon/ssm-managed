@@ -32,6 +32,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/shatteredsilicon/promconfig/config"
+	"github.com/shatteredsilicon/promconfig/discovery/targetgroup"
+	"github.com/shatteredsilicon/ssm-managed/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -140,7 +142,7 @@ func (svc *Service) putToConsul(scs []ScrapeConfig) error {
 }
 
 // getTargetsHealth gets all targets from Prometheus and converts response to job -> instance -> health map.
-func (svc *Service) getTargetsHealth(ctx context.Context) (map[string]map[string]Health, error) {
+func (svc *Service) getTargetsHealth(ctx context.Context, instances ...string) (map[string]map[string]Health, error) {
 	u := *svc.baseURL
 	u.Path = path.Join(u.Path, "api/v1/targets")
 	resp, err := svc.client.Get(u.String())
@@ -173,6 +175,9 @@ func (svc *Service) getTargetsHealth(ctx context.Context) (map[string]map[string
 	for _, target := range res.Data.ActiveTargets {
 		job := string(target.Labels["job"])
 		instance := string(target.Labels["instance"])
+		if len(instances) > 0 && !utils.SliceContains(instances, instance) {
+			continue
+		}
 		if health[job] == nil {
 			health[job] = make(map[string]Health)
 		}
@@ -305,7 +310,7 @@ func jobInstanceValues(cfg *ScrapeConfig, target string) (job string, instance s
 }
 
 // ListScrapeConfigs returns all scrape configs.
-func (svc *Service) ListScrapeConfigs(ctx context.Context) ([]ScrapeConfig, []ScrapeTargetHealth, error) {
+func (svc *Service) ListScrapeConfigs(ctx context.Context, instances ...string) ([]ScrapeConfig, []ScrapeTargetHealth, error) {
 	svc.lock.RLock()
 	defer svc.lock.RUnlock()
 
@@ -316,7 +321,7 @@ func (svc *Service) ListScrapeConfigs(ctx context.Context) ([]ScrapeConfig, []Sc
 	}
 	targetsHealthCh := make(chan targetsHealth)
 	go func() {
-		d, e := svc.getTargetsHealth(ctx)
+		d, e := svc.getTargetsHealth(ctx, instances...)
 		targetsHealthCh <- targetsHealth{d, e}
 	}()
 
@@ -324,26 +329,39 @@ func (svc *Service) ListScrapeConfigs(ctx context.Context) ([]ScrapeConfig, []Sc
 	if err != nil {
 		return nil, nil, err
 	}
-	config, err := svc.loadConfig()
+	prometheusConfig, err := svc.loadConfig()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// return data from Prometheus config to fill default values
-	res := make([]ScrapeConfig, len(consulData))
-	for i, consulCfg := range consulData {
-		var found bool
-		for _, configCfg := range config.ScrapeConfigs {
-			if consulCfg.JobName == configCfg.JobName {
-				res[i] = *convertInternalScrapeConfig(configCfg)
-				found = true
+	res := make([]ScrapeConfig, 0)
+	for _, consulCfg := range consulData {
+		var scrapeConfig *config.ScrapeConfig
+		for _, cfg := range prometheusConfig.ScrapeConfigs {
+			if consulCfg.JobName == cfg.JobName {
+				scrapeConfig = cfg
 				break
 			}
 		}
-		if !found {
+		if scrapeConfig == nil {
 			err = status.Errorf(codes.FailedPrecondition, "scrape config with job name %q not found in configuration file", consulCfg.JobName)
 			return nil, nil, err
 		}
+		if len(instances) > 0 {
+			newStaticConfigs := make([]*targetgroup.Group, 0)
+			for _, staticConfig := range scrapeConfig.ServiceDiscoveryConfig.StaticConfigs {
+				instance := string(staticConfig.Labels["instance"])
+				if utils.SliceContains(instances, instance) {
+					newStaticConfigs = append(newStaticConfigs, staticConfig)
+				}
+			}
+			scrapeConfig.ServiceDiscoveryConfig.StaticConfigs = newStaticConfigs
+		}
+		if len(scrapeConfig.ServiceDiscoveryConfig.StaticConfigs) == 0 {
+			continue
+		}
+		res = append(res, *convertInternalScrapeConfig(scrapeConfig))
 	}
 
 	health := <-targetsHealthCh
