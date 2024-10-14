@@ -4,6 +4,7 @@ package api;
 
 option go_package = ".;api";
 import "google/api/annotations.proto";
+import "google/protobuf/wrappers.proto";
 
 message NodeRemoveRequest {
     string name = 1;
@@ -28,6 +29,7 @@ message NodeInstanceService {
 message NodeInstance {
     string name = 1;
     repeated NodeInstanceService services = 2;
+    bool health_alerts_enabled = 3;
 }
 
 message NodeListResponse {
@@ -41,6 +43,14 @@ message NodeRemoveServiceRequest {
 }
 
 message NodeRemoveServiceResponse {
+}
+
+message HealthAlertsUpdateRequest {
+    string name = 1;
+    google.protobuf.BoolValue enabled = 2;
+}
+
+message HealthAlertsUpdateResponse {
 }
 
 service Node {
@@ -59,6 +69,13 @@ service Node {
     rpc RemoveService(NodeRemoveServiceRequest) returns (NodeRemoveServiceResponse) {
         option (google.api.http) = {
             delete: "/v0/nodes/{name}/services"
+            body: "*"
+        };
+    }
+
+    rpc UpdateHealthAlerts(HealthAlertsUpdateRequest) returns (HealthAlertsUpdateResponse) {
+        option (google.api.http) = {
+            put: "/v0/nodes/{name}/health-alerts"
             body: "*"
         };
     }
