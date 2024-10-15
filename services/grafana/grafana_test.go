@@ -30,7 +30,7 @@ import (
 func TestCreateAnnotation(t *testing.T) {
 	from := time.Now()
 	ctx, _ := logger.Set(context.Background(), t.Name())
-	c := NewClient("127.0.0.1:3000")
+	c := NewClient("127.0.0.1:3000", "grafana.db", "alerts")
 
 	t.Run("Normal", func(t *testing.T) {
 		msg, err := c.CreateAnnotation(ctx, []string{"tag1", "tag2"}, "Normal")

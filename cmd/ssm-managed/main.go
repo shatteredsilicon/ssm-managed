@@ -90,8 +90,10 @@ var (
 	prometheusURLF    = flag.String("prometheus-url", "http://127.0.0.1:9090/", "Prometheus base URL")
 	promtoolF         = flag.String("promtool", "promtool", "promtool path")
 
-	consulAddrF  = flag.String("consul-addr", "127.0.0.1:8500", "Consul HTTP API address")
-	grafanaAddrF = flag.String("grafana-addr", "127.0.0.1:3000", "Grafana HTTP API address")
+	consulAddrF        = flag.String("consul-addr", "127.0.0.1:8500", "Consul HTTP API address")
+	grafanaAddrF       = flag.String("grafana-addr", "127.0.0.1:3000", "Grafana HTTP API address")
+	grafanaDBF         = flag.String("grafana-db", "/var/lib/grafana/grafana.db", "Grafana database location")
+	grafanaAlertsPathF = flag.String("grafana-alerts-path", "/var/lib/grafana/plugins/ssm-app/dist/alerts", "Grafana alerts path")
 
 	dbNameF       = flag.String("db-name", "", "Database name")
 	dbUsernameF   = flag.String("db-username", "ssm-managed", "Database username")
@@ -394,7 +396,7 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 	l := logrus.WithField("component", "gRPC")
 	l.Infof("Starting server on http://%s/ ...", *gRPCAddrF)
 
-	grafana := grafana.NewClient(*grafanaAddrF)
+	grafana := grafana.NewClient(*grafanaAddrF, *grafanaDBF, *grafanaAlertsPathF)
 
 	gRPCServer := grpc.NewServer(
 		grpc.UnaryInterceptor(interceptors.Unary),
@@ -427,8 +429,9 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 		Grafana: grafana,
 	})
 	api.RegisterNodeServer(gRPCServer, &handlers.NodeServer{
-		Node:   deps.node,
-		Remote: deps.remote,
+		Node:    deps.node,
+		Remote:  deps.remote,
+		Grafana: grafana,
 	})
 
 	grpc_prometheus.Register(gRPCServer)

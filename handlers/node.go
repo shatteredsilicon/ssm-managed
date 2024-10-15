@@ -7,6 +7,7 @@ import (
 
 	"github.com/shatteredsilicon/ssm-managed/api"
 	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	nodeSvc "github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
@@ -17,8 +18,9 @@ import (
 
 // NodeServer server for node apis
 type NodeServer struct {
-	Node   *nodeSvc.Service
-	Remote *remote.Service
+	Node    *nodeSvc.Service
+	Remote  *remote.Service
+	Grafana *grafana.Client
 }
 
 // Remove removes nodes.
@@ -76,6 +78,20 @@ func (s *NodeServer) List(ctx context.Context, req *api.NodeListRequest) (*api.N
 		return nil, err
 	}
 	resp.Instances = s.putPrometheusNodes(promNodes, resp.Instances)
+
+	instances := make([]string, len(resp.Instances))
+	for i := range resp.Instances {
+		instances[i] = resp.Instances[i].Name
+	}
+	if healthAlertsEnabledMap, err := s.Grafana.HealthAlertsEnabledMap(ctx, instances...); err != nil {
+		logger.Get(ctx).Errorf("get health alerts enabled map failed: %+v", err)
+	} else {
+		for i := range resp.Instances {
+			if healthAlertsEnabledMap[resp.Instances[i].Name] {
+				resp.Instances[i].HealthAlertsEnabled = true
+			}
+		}
+	}
 
 	return &resp, nil
 }
@@ -261,4 +277,24 @@ func (s *NodeServer) putPrometheusNodes(nodes []prometheus.NodeService, respNode
 	}
 
 	return respNodes
+}
+
+func (s *NodeServer) UpdateHealthAlerts(ctx context.Context, req *api.HealthAlertsUpdateRequest) (*api.HealthAlertsUpdateResponse, error) {
+	var resp api.HealthAlertsUpdateResponse
+
+	if req.Enabled == nil {
+		return &resp, nil
+	}
+
+	if req.Enabled.Value {
+		if err := s.Grafana.EnableHealthAlerts(ctx, req.Name); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.Grafana.DisableHealthAlerts(ctx, req.Name); err != nil {
+			return nil, err
+		}
+	}
+
+	return &resp, nil
 }
