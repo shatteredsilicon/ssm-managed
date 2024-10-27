@@ -25,7 +25,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/AlekSi/pointer"
 	"github.com/go-sql-driver/mysql"
@@ -49,9 +48,6 @@ import (
 
 const (
 	defaultMySQLPort uint32 = 3306
-
-	// maximum time for connecting to the database and running all queries
-	sqlCheckTimeout = 5 * time.Second
 )
 
 var versionRegexp = regexp.MustCompile(`([\d\.]+)-.*`)
@@ -292,7 +288,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 	dsn := agent.DSN(service)
 	db, err := sql.Open("mysql", dsn)
 	if err == nil {
-		sqlCtx, cancel := context.WithTimeout(ctx, sqlCheckTimeout)
+		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
 		err = db.QueryRowContext(sqlCtx, "SELECT COUNT(*) FROM information_schema.tables").Scan(&tableCount)
 		cancel()
 		db.Close()
@@ -734,7 +730,7 @@ func (svc *Service) EngineAndEngineVersion(ctx context.Context, host string, por
 	dsn := agent.DSN(service)
 	db, err := sql.Open("mysql", dsn)
 	if err == nil {
-		sqlCtx, cancel := context.WithTimeout(ctx, sqlCheckTimeout)
+		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
 		err = db.QueryRowContext(sqlCtx, "SELECT @@version, @@version_comment").Scan(&version, &versionComment)
 		cancel()
 		db.Close()
