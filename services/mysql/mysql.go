@@ -320,6 +320,11 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *servicelib.Config {
 	name := models.NameForSupervisor(agent.Type, *agent.ListenPort)
 
+	tableStatsValue := "1"
+	if agent.MySQLDisableTablestats != nil && *agent.MySQLDisableTablestats {
+		// disable tablestats and a few related collectors just like ssm-admin
+		tableStatsValue = "0"
+	}
 	arguments := []string{
 		"-collect.binlog_size",
 		"-collect.global_status",
@@ -331,18 +336,14 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 		"-collect.perf_schema.eventswaits",
 		"-collect.perf_schema.file_events",
 		"-collect.slave_status",
+		fmt.Sprintf("-collect.auto_increment.columns=%s", tableStatsValue),
+		fmt.Sprintf("-collect.info_schema.tables=%s", tableStatsValue),
+		fmt.Sprintf("-collect.info_schema.tablestats=%s", tableStatsValue),
+		fmt.Sprintf("-collect.perf_schema.indexiowaits=%s", tableStatsValue),
+		fmt.Sprintf("-collect.perf_schema.tableiowaits=%s", tableStatsValue),
+		fmt.Sprintf("-collect.perf_schema.tablelocks=%s", tableStatsValue),
 		fmt.Sprintf("-web.listen-address=127.0.0.1:%d", *agent.ListenPort),
 		"-web.auth-file=\"\"",
-	}
-	if agent.MySQLDisableTablestats == nil || !*agent.MySQLDisableTablestats {
-		// enable tablestats and a few related collectors just like pmm-admin
-		// https://github.com/shatteredsilicon/ssm-client/blob/e94b61ed0e5482a27039f0d1b0b36076731f0c29/pmm/plugin/mysql/metrics/metrics.go#L98-L105
-		arguments = append(arguments, "-collect.auto_increment.columns")
-		arguments = append(arguments, "-collect.info_schema.tables")
-		arguments = append(arguments, "-collect.info_schema.tablestats")
-		arguments = append(arguments, "-collect.perf_schema.indexiowaits")
-		arguments = append(arguments, "-collect.perf_schema.tableiowaits")
-		arguments = append(arguments, "-collect.perf_schema.tablelocks")
 	}
 	sort.Strings(arguments)
 
