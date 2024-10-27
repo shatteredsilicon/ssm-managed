@@ -25,7 +25,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/AlekSi/pointer"
 	"github.com/go-sql-driver/mysql"
@@ -47,9 +46,6 @@ import (
 
 const (
 	defaultPostgreSQLPort uint32 = 5432
-
-	// maximum time for connecting to the database and running all queries
-	sqlCheckTimeout = 5 * time.Second
 )
 
 // regexps to extract version numbers from the `SELECT version()` output
@@ -330,7 +326,7 @@ func (svc *Service) engineAndEngineVersion(ctx context.Context, host string, por
 	dsn := agent.DSN(service)
 	db, err := sql.Open("postgres", dsn)
 	if err == nil {
-		sqlCtx, cancel := context.WithTimeout(ctx, sqlCheckTimeout)
+		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
 		err = db.QueryRowContext(sqlCtx, "SELECT version()").Scan(&databaseVersion)
 		cancel()
 		db.Close()
@@ -474,7 +470,7 @@ func (svc *Service) addPostgresExporter(ctx context.Context, tx *reform.TX, serv
 	dsn := agent.DSN(service)
 	db, err := sql.Open("postgres", dsn)
 	if err == nil {
-		sqlCtx, cancel := context.WithTimeout(ctx, sqlCheckTimeout)
+		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
 		err = db.QueryRowContext(sqlCtx, "SELECT COUNT(*) FROM information_schema.tables").Scan(&tableCount)
 		cancel()
 		db.Close()

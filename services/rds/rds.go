@@ -57,9 +57,6 @@ import (
 const (
 	// maximum time for AWS discover APIs calls
 	awsDiscoverTimeout = 7 * time.Second
-
-	// maximum time for connecting to the database and running all queries
-	sqlCheckTimeout = 5 * time.Second
 )
 
 type ServiceConfig struct {
@@ -500,7 +497,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 	dsn := agent.DSN(svc.MySQLServiceFromRDSService(service))
 	db, err := sql.Open("mysql", dsn)
 	if err == nil {
-		sqlCtx, cancel := context.WithTimeout(ctx, sqlCheckTimeout)
+		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
 		err = db.QueryRowContext(sqlCtx, "SELECT COUNT(*) FROM information_schema.tables").Scan(&tableCount)
 		cancel()
 		db.Close()
