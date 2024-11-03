@@ -501,7 +501,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 		err = db.QueryRowContext(sqlCtx, "SELECT COUNT(*) FROM information_schema.tables").Scan(&tableCount)
 		cancel()
 		db.Close()
-		agent.MySQLDisableTablestats = pointer.ToBool(tableCount > 1000)
+		agent.MySQLDisableTablestats = pointer.ToBool(tableCount > int(services.DisableTablestatsLimit()))
 	}
 	if err != nil {
 		if err, ok := err.(*mysql.MySQLError); ok {
@@ -542,7 +542,6 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 		"-collect.info_schema.processlist",
 		"-collect.info_schema.query_response_time",
 		"-collect.info_schema.userstats",
-		"-collect.perf_schema.eventswaits",
 		"-collect.perf_schema.file_events",
 		"-collect.slave_status",
 		fmt.Sprintf("-collect.auto_increment.columns=%s", tableStatsValue),
@@ -551,6 +550,7 @@ func (svc *Service) mysqlExporterCfg(agent *models.MySQLdExporter, dsn string) *
 		fmt.Sprintf("-collect.perf_schema.indexiowaits=%s", tableStatsValue),
 		fmt.Sprintf("-collect.perf_schema.tableiowaits=%s", tableStatsValue),
 		fmt.Sprintf("-collect.perf_schema.tablelocks=%s", tableStatsValue),
+		fmt.Sprintf("-collect.perf_schema.eventswaits=%s", tableStatsValue),
 		fmt.Sprintf("-web.listen-address=127.0.0.1:%d", *agent.ListenPort),
 		"-web.auth-file=\"\"",
 	}
