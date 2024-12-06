@@ -41,7 +41,7 @@ import (
 
 const (
 	defaultOrgID              = 1
-	defaultAlertRuleNamespace = "Insight"
+	defaultAlertRuleNamespace = "Alerts"
 	defaultDatasource         = "Prometheus"
 	defaultIntervalSeconds    = 60
 )
