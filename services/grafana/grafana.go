@@ -41,7 +41,7 @@ import (
 
 const (
 	defaultOrgID              = 1
-	defaultAlertRuleNamespace = "Insight"
+	defaultAlertRuleNamespace = "Alerts"
 	defaultDatasource         = "Prometheus"
 	defaultIntervalSeconds    = 60
 )
@@ -336,12 +336,15 @@ func (c *Client) EnableHealthAlerts(ctx context.Context, instance string) error 
 		if rule.Annotations == nil {
 			rule.Annotations = make(map[string]*string)
 		}
-		if _, exists := rule.Annotations["__dashboardUid__"]; !exists && rule.DashboardUID != nil {
+		if rule.Annotations["__dashboardUid__"] == nil && rule.Annotations["__panelId__"] == nil && rule.DashboardUID != nil && rule.PanelID != nil {
 			rule.Annotations["__dashboardUid__"] = rule.DashboardUID
-		}
-		if _, exists := rule.Annotations["__panelId__"]; !exists && rule.PanelID != nil {
+			dashboardURL := fmt.Sprintf("http/../d/%s?var-host=%s", *rule.DashboardUID, instance)
+			rule.Annotations["Dashboard URL"] = &dashboardURL
+
 			panelID := fmt.Sprintf("%d", *rule.PanelID)
 			rule.Annotations["__panelId__"] = &panelID
+			panelURL := fmt.Sprintf("http/../d/%s?var-host=%s&viewPanel=panel-%d", *rule.DashboardUID, instance, *rule.PanelID)
+			rule.Annotations["Panel URL"] = &panelURL
 		}
 		annotationsBytes, err := json.Marshal(rule.Annotations)
 		if err != nil {
