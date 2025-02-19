@@ -1,5 +1,5 @@
 [Unit]
-Description=Configuration API of PMM server components
+Description=Configuration API of SSM server components
 After=network.target consul.service
 
 [Service]
