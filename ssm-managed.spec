@@ -21,7 +21,7 @@ URL:		https://%{provider_prefix}
 Source0:	%{name}-%{version}-%{release}.tar.gz
 Source1:	https://github.com/googleapis/googleapis/archive/%{googleapis_branch}/googleapis-%{googleapis_branch}.tar.gz
 
-BuildRequires:	golang, protobuf, protobuf-devel, protobuf-compiler
+BuildRequires:	golang >= 1.24, protobuf, protobuf-devel, protobuf-compiler
 
 %if 0%{?fedora} || 0%{?rhel} == 7
 BuildRequires: systemd
