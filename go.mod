@@ -7,7 +7,7 @@ toolchain go1.24.2
 require (
 	github.com/AlekSi/pointer v1.2.0
 	github.com/aws/aws-sdk-go v1.48.13
-	github.com/go-sql-driver/mysql v1.5.0
+	github.com/go-sql-driver/mysql v1.9.2
 	github.com/go-swagger/go-swagger v0.30.5
 	github.com/golang/protobuf v1.5.4
 	github.com/golang/snappy v0.0.4
@@ -39,6 +39,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
@@ -124,5 +125,3 @@ require (
 	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/go-sql-driver/mysql => github.com/shatteredsilicon/go-sql-driver-mysql v0.0.0-20231031081844-ca087917bf67
