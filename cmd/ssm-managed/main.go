@@ -66,6 +66,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/services/snmp"
 	"github.com/shatteredsilicon/ssm-managed/services/supervisor"
+	"github.com/shatteredsilicon/ssm-managed/services/watch"
 	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/interceptors"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
@@ -585,6 +586,22 @@ func runMetricService(ctx context.Context, consulClient *consul.Client, promethe
 	svc.Run(ctx)
 }
 
+func runWatchService(
+	ctx context.Context,
+	node *node.Service,
+	remote *remote.Service,
+	rds *rds.Service,
+	mysql *mysql.Service,
+	postgresql *postgresql.Service,
+	db *reform.DB,
+	consul *consul.Client,
+) {
+	l := logrus.WithField("component", "watch")
+
+	svc := watch.NewService(node, remote, rds, mysql, postgresql, db, consul, l)
+	svc.Run(ctx)
+}
+
 func main() {
 	log.SetFlags(0)
 	log.Printf("ssm-managed %s", utils.Version)
@@ -758,6 +775,12 @@ func main() {
 	go func() {
 		defer wg.Done()
 		runMetricService(ctx, consulClient, prometheus, prometheusAPI)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runWatchService(ctx, nodeService, remoteService, rds, mysqlService, postgres, db, consulClient)
 	}()
 
 	wg.Wait()
