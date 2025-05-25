@@ -752,7 +752,7 @@ func NormalizeEngineAndEngineVersion(engine string, engineVersion string) (strin
 
 	lowerEngine := strings.ToLower(engine)
 	switch {
-	case strings.Contains(lowerEngine, "mariadb"):
+	case strings.Contains(lowerEngine, "mariadb") || strings.Contains(strings.ToLower(engineVersion), "mariadb"):
 		return "MariaDB", engineVersion, nil
 	case strings.Contains(lowerEngine, "percona"):
 		return "Percona Server", engineVersion, nil

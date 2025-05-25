@@ -262,7 +262,7 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 		}
 		id = node.ID
 
-		engine, engineVersion, err := svc.engineAndEngineVersion(ctx, address, port, username, password)
+		engine, engineVersion, err := svc.EngineAndEngineVersion(ctx, address, port, username, password)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -313,7 +313,8 @@ func (svc *Service) clientInstanceAdded(ctx context.Context, name string) (bool,
 	return false, nil
 }
 
-func (svc *Service) engineAndEngineVersion(ctx context.Context, host string, port uint32, username string, password string) (string, string, error) {
+// EngineAndEngineVersion get postgresql engine version
+func (svc *Service) EngineAndEngineVersion(ctx context.Context, host string, port uint32, username string, password string) (string, string, error) {
 	var databaseVersion string
 	agent := models.PostgresExporter{
 		ServiceUsername: pointer.ToString(username),

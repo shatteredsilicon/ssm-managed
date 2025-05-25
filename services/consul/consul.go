@@ -81,6 +81,11 @@ func (c *Client) DeregisterService(nodeID, serviceID string) (*api.WriteMeta, er
 	}, nil)
 }
 
+// Register register consul catalog service
+func (c *Client) Register(reg *api.CatalogRegistration, q *api.WriteOptions) (*api.WriteMeta, error) {
+	return c.c.Catalog().Register(reg, q)
+}
+
 // GetKV returns value for a given key from Consul, or nil, if key does not exist.
 func (c *Client) GetKV(key string) ([]byte, error) {
 	key = path.Join(prefix, key)

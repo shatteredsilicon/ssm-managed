@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/golang/snappy"
@@ -24,6 +25,7 @@ const (
 	targetsURI     = "api/v1/targets"
 	labelValuesURI = "api/v1/label/%s/values"
 	remoteWriteURI = "api/v1/write"
+	seriesURI      = "api/v1/series"
 )
 
 var scrapePoolServiceMap = map[string]models.AgentType{
@@ -286,4 +288,57 @@ func (svc *Service) WriteMetrics(ctx context.Context, payload api.WriteRequest) 
 	}
 
 	return errors.New(fmt.Sprintf("remote write api didn't response with an success status code, tried %d times", retryTimes))
+}
+
+// SeriesResponse response struct of prometheus' series API
+type SeriesResponse struct {
+	Status string              `json:"status"`
+	Data   []map[string]string `json:"data"`
+}
+
+func (svc *Service) GetSeries(queries []map[string]string, urlParams ...string) (*SeriesResponse, error) {
+	u := *svc.baseURL
+	u.Path = path.Join(u.Path, seriesURI)
+	q := u.Query()
+
+	if len(urlParams)%2 != 0 {
+		return nil, errors.Errorf("amount of urlParams should be even")
+	}
+
+	for i := range queries {
+		queryStrs, j := make([]string, len(queries[i])), 0
+		for k, v := range queries[i] {
+			queryStrs[j] = fmt.Sprintf("%s\"%s\"", k, v)
+			j++
+		}
+		q.Add("match[]", fmt.Sprintf("{%s}", strings.Join(queryStrs, ",")))
+	}
+	for i := 0; i < len(urlParams)-1; i = i + 2 {
+		q.Set(urlParams[i], urlParams[i+1])
+	}
+	u.RawQuery = q.Encode()
+	resp, err := svc.client.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, errors.Errorf("unexpected api %s returns: code: %d, data: %s", u.String(), resp.StatusCode, string(b))
+	}
+
+	var data SeriesResponse
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return nil, err
+	}
+	if data.Status != "success" {
+		return nil, errors.Errorf("unexpected api %s status: %s", u.String(), data.Status)
+	}
+
+	return &data, nil
 }

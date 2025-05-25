@@ -872,3 +872,97 @@ func (svc *Service) genPrometheusQueries(nodeName string, service string) map[st
 
 	return queries
 }
+
+// EngineVersion engine and engine version
+type EngineVersion struct {
+	Engine  string
+	Version string
+}
+
+var serviceEngineSeries = map[string]struct {
+	Name               string
+	EngineLabel        string
+	EngineVersionLabel string
+}{
+	"linux": {
+		Name:               "node_uname_info",
+		EngineLabel:        "release",
+		EngineVersionLabel: "version",
+	},
+	"mysql": {
+		Name:               "mysql_version_info",
+		EngineLabel:        "version_comment",
+		EngineVersionLabel: "version",
+	},
+	"postresql": {
+		Name:               "pg_static",
+		EngineVersionLabel: "short_version",
+	},
+	"mongodb": {
+		Name:               "mongodb_mongod_version_info",
+		EngineVersionLabel: "mongodb",
+	},
+}
+
+// GetServiceEngine get engine info from prometheus.
+// Returns map[instance]map[service]EngineVersion
+func (svc *Service) GetServiceEngine(instanceServices map[string][]string) (map[string]map[string]*EngineVersion, error) {
+	result := make(map[string]map[string]*EngineVersion)
+
+	for instance, services := range instanceServices {
+		queries := make([]map[string]string, 0)
+		series2services := make(map[string]string)
+		for _, service := range services {
+			series, ok := serviceEngineSeries[service]
+			if !ok {
+				continue
+			}
+			queries = append(queries, map[string]string{
+				"__name__=~": series.Name,
+				"instance=":  instance,
+			})
+			series2services[series.Name] = service
+		}
+		if len(queries) == 0 {
+			continue
+		}
+
+		resp, err := svc.prometheus.GetSeries(queries,
+			"start", fmt.Sprintf("%d", time.Now().Add(-1*time.Hour).Unix()),
+			"end", fmt.Sprintf("%d", time.Now().Unix()),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, series := range resp.Data {
+			if series == nil || series2services[series["__name__"]] == "" {
+				continue
+			}
+
+			if _, ok := result[instance]; !ok {
+				result[instance] = make(map[string]*EngineVersion)
+			}
+
+			service := series2services[series["__name__"]]
+			if result[instance][service] != nil {
+				// there are more than one engine series for this service,
+				// we wait until there is only one left to decide which is
+				// the newest one.
+				delete(result[instance], service)
+				continue
+			}
+
+			engine := series[serviceEngineSeries[service].EngineLabel]
+
+			engineVersion := series[serviceEngineSeries[service].EngineVersionLabel]
+
+			result[instance][service] = &EngineVersion{
+				Engine:  engine,
+				Version: engineVersion,
+			}
+		}
+	}
+
+	return result, nil
+}
