@@ -825,8 +825,8 @@ func (svc *Service) GetQanNodes(ctx context.Context, name string, checkData bool
 }
 
 // GetPrometheusNodes returns client nodes from prometheus
-func (svc *Service) GetPrometheusNodes(ctx context.Context) ([]prometheus.NodeService, error) {
-	return svc.prometheus.GetNodeServices(ctx)
+func (svc *Service) GetPrometheusNodes(ctx context.Context, checkDataDurations ...time.Duration) ([]prometheus.NodeService, error) {
+	return svc.prometheus.GetNodeServices(ctx, checkDataDurations...)
 }
 
 // GetRegionFromAgentType returns region of agent type

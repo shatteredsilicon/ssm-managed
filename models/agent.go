@@ -55,6 +55,7 @@ const (
 	ClientMongoDBExporterAgentType  AgentType = "mongodb:metrics"
 	ClientMongoDBQanAgentAgentType  AgentType = "mongodb:queries"
 	ClientPostgresExporterAgentType AgentType = "postgresql:metrics"
+	ClientPostgresQanAgentAgentType AgentType = "postgresql:queries"
 	ClientProxySQLExporterAgentType AgentType = "proxysql:metrics"
 
 	QanAgentPort    uint16 = 9000

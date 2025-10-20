@@ -4,17 +4,19 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/shatteredsilicon/ssm-managed/api"
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
-	"github.com/shatteredsilicon/ssm-managed/services/node"
 	nodeSvc "github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
+
+const activeCheckDuration = 24 * time.Hour
 
 // NodeServer server for node apis
 type NodeServer struct {
@@ -72,7 +74,7 @@ func (s *NodeServer) List(ctx context.Context, req *api.NodeListRequest) (*api.N
 	}
 	resp.Instances = s.putQanNodes(qanNodes, resp.Instances)
 
-	promNodes, err := s.Node.GetPrometheusNodes(ctx)
+	promNodes, err := s.Node.GetPrometheusNodes(ctx, activeCheckDuration)
 	if err != nil {
 		logger.Get(ctx).Errorf("get unremoved prometheus nodes failed: %+v", err)
 		return nil, err
@@ -131,7 +133,7 @@ func (s *NodeServer) putRemoteNodes(nodes []remote.FullInstance, respNodes []*ap
 	return respNodes
 }
 
-func (s *NodeServer) putConsulNodes(nodes []node.ClientNode, respNodes []*api.NodeInstance) []*api.NodeInstance {
+func (s *NodeServer) putConsulNodes(nodes []nodeSvc.ClientNode, respNodes []*api.NodeInstance) []*api.NodeInstance {
 	for _, node := range nodes {
 		if len(node.Services) == 0 {
 			continue
@@ -175,15 +177,21 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 			continue
 		}
 
-		var nis api.NodeInstanceService
+		nis := api.NodeInstanceService{
+			IsActive: time.Since(node.LatestDataTs) < activeCheckDuration,
+		}
 		if node.OSName == string(models.SSMServerNodeType) {
 			nis.Region = string(models.RemoteNodeRegion)
 			nis.Type = string(models.QanAgentAgentType)
 		} else {
 			nis.Region = string(models.ClientNodeRegion)
-			nis.Type = string(models.ClientMySQLQanAgentAgentType)
-			if node.SubsystemID == qan.SubsystemMongo {
+			switch node.SubsystemID {
+			case qan.SubsystemMySQL:
+				nis.Type = string(models.ClientMySQLQanAgentAgentType)
+			case qan.SubsystemMongo:
 				nis.Type = string(models.ClientMongoDBQanAgentAgentType)
+			case qan.SubsystemPostgreSQL:
+				nis.Type = string(models.ClientPostgresQanAgentAgentType)
 			}
 		}
 
@@ -195,15 +203,16 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 
 			serviceExists := false
 			for _, service := range respNodes[i].Services {
-				if node.SubsystemID == qan.SubsystemMySQL && (service.Type == string(models.QanAgentAgentType) ||
-					service.Type == string(models.ClientMySQLQanAgentAgentType)) {
-					serviceExists = true
-					break
-				} else if node.SubsystemID == qan.SubsystemMongo && (service.Type == string(models.QanAgentAgentType) ||
-					service.Type == string(models.ClientMongoDBQanAgentAgentType)) {
-					serviceExists = true
-					break
+				if service.Type != nis.Type {
+					continue
 				}
+
+				if nis.IsActive && !service.IsActive {
+					service.IsActive = true
+				}
+
+				serviceExists = true
+				break
 			}
 
 			if !serviceExists {
@@ -235,9 +244,10 @@ func (s *NodeServer) putPrometheusNodes(nodes []prometheus.NodeService, respNode
 
 		addressParts := strings.Split(node.Endpoint, ":")
 		nis := api.NodeInstanceService{
-			Type:    string(node.Type),
-			Region:  s.Node.GetRegionFromAgentType(node.Type),
-			Address: addressParts[0],
+			Type:     string(node.Type),
+			Region:   s.Node.GetRegionFromAgentType(node.Type),
+			Address:  addressParts[0],
+			IsActive: node.IsUp,
 		}
 		if len(addressParts) > 1 {
 			port, _ := strconv.Atoi(addressParts[1])
@@ -253,6 +263,9 @@ func (s *NodeServer) putPrometheusNodes(nodes []prometheus.NodeService, respNode
 			serviceExists := false
 			for _, service := range respNodes[i].Services {
 				if service.Type == nis.Type {
+					if nis.IsActive && !service.IsActive {
+						service.IsActive = true
+					}
 					serviceExists = true
 					break
 				}

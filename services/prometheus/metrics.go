@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/model"
 	"github.com/shatteredsilicon/ssm-managed/api"
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
@@ -26,6 +27,7 @@ const (
 	labelValuesURI = "api/v1/label/%s/values"
 	remoteWriteURI = "api/v1/write"
 	seriesURI      = "api/v1/series"
+	queryURI       = "api/v1/query"
 )
 
 var scrapePoolServiceMap = map[string]models.AgentType{
@@ -74,6 +76,15 @@ type TargetResponse struct {
 	Data   TargetData `json:"data"`
 }
 
+// QueryResponse response structrue of prometheus GET query api
+type QueryResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		ResultType model.ValueType `json:"resultType"`
+		Result     model.Vector    `json:"result"`
+	} `json:"data"`
+}
+
 // NodeService service of node
 type NodeService struct {
 	Name           string
@@ -82,6 +93,7 @@ type NodeService struct {
 	now            time.Time
 	lastScrape     time.Time
 	scrapeInterval time.Duration
+	IsUp           bool
 }
 
 func (ns NodeService) IsActive() bool {
@@ -89,7 +101,7 @@ func (ns NodeService) IsActive() bool {
 }
 
 // GetNodeServices returns services of ndoe
-func (svc *Service) GetNodeServices(ctx context.Context) ([]NodeService, error) {
+func (svc *Service) GetNodeServices(ctx context.Context, checkDataDurations ...time.Duration) ([]NodeService, error) {
 	u := *svc.baseURL
 	u.Path = path.Join(u.Path, targetsURI)
 	resp, err := svc.client.Get(u.String())
@@ -98,7 +110,7 @@ func (svc *Service) GetNodeServices(ctx context.Context) ([]NodeService, error) 
 	}
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -134,18 +146,59 @@ func (svc *Service) GetNodeServices(ctx context.Context) ([]NodeService, error) 
 			}
 		}
 
+		if exists {
+			continue
+		}
+
 		lastScrape, _ := time.Parse(time.RFC3339, target.LastScrape)
 		scrapeInterval, _ := time.ParseDuration(target.ScrapeInterval)
-		if !exists {
-			services = append(services, NodeService{
-				Name:           target.Labels.Instance,
-				Type:           agentType,
-				Endpoint:       target.DiscoveredLabels.Address,
-				lastScrape:     lastScrape,
-				scrapeInterval: scrapeInterval,
-				now:            time.Now(),
-			})
+		service := NodeService{
+			Name:           target.Labels.Instance,
+			Type:           agentType,
+			Endpoint:       target.DiscoveredLabels.Address,
+			lastScrape:     lastScrape,
+			scrapeInterval: scrapeInterval,
+			now:            time.Now(),
 		}
+
+		if len(checkDataDurations) == 0 {
+			services = append(services, service)
+			continue
+		}
+
+		u := *svc.baseURL
+		u.Path = path.Join(u.Path, queryURI)
+		q := u.Query()
+		q.Add("query", fmt.Sprintf(`max_over_time(up{instance="%s",job="%s"}[%s])`, target.Labels.Instance, target.Labels.Job, checkDataDurations[0].String()))
+		u.RawQuery = q.Encode()
+
+		resp, err := svc.client.Get(u.String())
+		if err != nil {
+			return nil, err
+		}
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			return nil, errors.Errorf("unexpected api %s returns: code: %d, data: %s", u.String(), resp.StatusCode, string(b))
+		}
+
+		var data QueryResponse
+		err = json.Unmarshal(b, &data)
+		if err != nil {
+			return nil, err
+		}
+		if data.Status != "success" {
+			return nil, errors.Errorf("unexpected api %s status: %s", u.String(), data.Status)
+		}
+
+		if len(data.Data.Result) > 0 && data.Data.Result[0].Value.String() == "1" {
+			service.IsUp = true
+		}
+		services = append(services, service)
 	}
 
 	return services, nil
@@ -323,7 +376,7 @@ func (svc *Service) GetSeries(queries []map[string]string, urlParams ...string) 
 	}
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

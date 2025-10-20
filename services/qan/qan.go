@@ -61,6 +61,7 @@ const (
 	SubsystemAgent
 	SubsystemMySQL
 	SubsystemMongo
+	SubsystemPostgreSQL
 )
 
 // QANCommandError for errors returned by QAN API
@@ -764,6 +765,7 @@ type UnremovedNode struct {
 	InstanceUUID string
 	SubsystemID  int
 	OSName       string
+	LatestDataTs time.Time
 }
 
 // GetUnremovedNodes returns unremoved nodes,
@@ -772,22 +774,23 @@ func (svc *Service) GetUnremovedNodes(ctx context.Context, instanceName string, 
 	var nodes []UnremovedNode
 
 	q1 := `
-SELECT inst.name, inst.uuid, inst.subsystem_id, inst.parent_uuid
+SELECT inst.name, inst.uuid, inst.subsystem_id, inst.parent_uuid, qgm.start_ts
 FROM (
-	SELECT DISTINCT instance_id
+	SELECT instance_id, MAX(start_ts) AS start_ts
 	FROM query_global_metrics
+	GROUP BY instance_id
 ) qgm
 JOIN instances inst ON qgm.instance_id = inst.instance_id
-WHERE (inst.subsystem_id = ? OR inst.subsystem_id = ?)
+WHERE (inst.subsystem_id = ? OR inst.subsystem_id = ? OR inst.subsystem_id = ?)
 `
 	q2 := `
-SELECT name, uuid, subsystem_id, parent_uuid
+SELECT name, uuid, subsystem_id, parent_uuid, NULL AS start_ts
 FROM instances
-WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instances.subsystem_id = ?)
+WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instances.subsystem_id = ? OR instances.subsystem_id = ?)
 `
 
-	q1Args := []interface{}{SubsystemMySQL, SubsystemMongo}
-	q2Args := []interface{}{qanDeletedTimeZero, SubsystemMySQL, SubsystemMongo}
+	q1Args := []interface{}{SubsystemMySQL, SubsystemMongo, SubsystemPostgreSQL}
+	q2Args := []interface{}{qanDeletedTimeZero, SubsystemMySQL, SubsystemMongo, SubsystemPostgreSQL}
 	if instanceName != "" {
 		q1 += " AND inst.name = ?"
 		q2 += " AND name = ?"
@@ -801,7 +804,7 @@ WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instan
 	}
 
 	q := fmt.Sprintf(`
-SELECT inst2.name, inst2.uuid, inst2.subsystem_id, inst1.name AS os_name
+SELECT inst2.name, inst2.uuid, inst2.subsystem_id, inst2.start_ts, inst1.name AS os_name
 FROM instances inst1
 JOIN (
 	%s
@@ -819,8 +822,9 @@ JOIN (
 
 	var name, instanceUUID, osName string
 	var subsystemID int
+	var latestQANTs sql.NullTime
 	for rows.Next() {
-		err = rows.Scan(&name, &instanceUUID, &subsystemID, &osName)
+		err = rows.Scan(&name, &instanceUUID, &subsystemID, &latestQANTs, &osName)
 		if err != nil {
 			return nil, err
 		}
@@ -829,6 +833,7 @@ JOIN (
 			InstanceUUID: instanceUUID,
 			SubsystemID:  subsystemID,
 			OSName:       osName,
+			LatestDataTs: latestQANTs.Time,
 		})
 	}
 
