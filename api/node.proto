@@ -29,7 +29,8 @@ message NodeInstanceService {
 message NodeInstance {
     string name = 1;
     repeated NodeInstanceService services = 2;
-    bool health_alerts_enabled = 3;
+    reserved 3; // health_alerts_enabled
+    int32 health_alerts_state = 4; // 0 = disabled, 1 = enabled, 2 = partially enabled
 }
 
 message NodeListResponse {
