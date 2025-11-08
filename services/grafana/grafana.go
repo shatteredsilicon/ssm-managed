@@ -50,6 +50,12 @@ const (
 	defaultExecErrState       = "Alerting"
 )
 
+const (
+	typeAlertRulesDisabled = iota
+	typeAlertRulesEnabled
+	typeAlertRulesPartiallyEnabled
+)
+
 // Client represents a client for Grafana API.
 type Client struct {
 	addr       string
@@ -206,8 +212,8 @@ type alertRuleParam struct {
 	Instance      string
 }
 
-func (c *Client) HealthAlertsEnabledMap(ctx context.Context, instances ...string) (map[string]bool, error) {
-	enabledMap := make(map[string]bool)
+func (c *Client) HealthAlertsStateMap(ctx context.Context, instances ...string) (map[string]int32, error) {
+	stateMap := make(map[string]int32)
 
 	db, err := sql.Open("sqlite3", c.db)
 	if err != nil {
@@ -220,7 +226,7 @@ func (c *Client) HealthAlertsEnabledMap(ctx context.Context, instances ...string
 	}
 
 	if len(alertFiles) == 0 || len(instances) == 0 {
-		return map[string]bool{}, nil
+		return map[string]int32{}, nil
 	}
 
 	for _, instance := range instances {
@@ -251,14 +257,26 @@ func (c *Client) HealthAlertsEnabledMap(ctx context.Context, instances ...string
 				return nil, err
 			}
 
-			if id != 0 {
-				enabledMap[instance] = true
+			if err == sql.ErrNoRows || id == 0 {
+				if state, ok := stateMap[instance]; !ok {
+					stateMap[instance] = typeAlertRulesDisabled
+				} else if state == typeAlertRulesEnabled {
+					stateMap[instance] = typeAlertRulesPartiallyEnabled
+					break
+				}
+				continue
 			}
-			break
+
+			if state, ok := stateMap[instance]; !ok {
+				stateMap[instance] = typeAlertRulesEnabled
+			} else if state == typeAlertRulesDisabled {
+				stateMap[instance] = typeAlertRulesPartiallyEnabled
+				break
+			}
 		}
 	}
 
-	return enabledMap, nil
+	return stateMap, nil
 }
 
 func (c *Client) alertFiles() ([]string, error) {
