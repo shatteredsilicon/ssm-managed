@@ -83,13 +83,11 @@ func (s *NodeServer) List(ctx context.Context, req *api.NodeListRequest) (*api.N
 	for i := range resp.Instances {
 		instances[i] = resp.Instances[i].Name
 	}
-	if healthAlertsEnabledMap, err := s.Grafana.HealthAlertsEnabledMap(ctx, instances...); err != nil {
+	if healthAlertsStateMap, err := s.Grafana.HealthAlertsStateMap(ctx, instances...); err != nil {
 		logger.Get(ctx).Errorf("get health alerts enabled map failed: %+v", err)
 	} else {
 		for i := range resp.Instances {
-			if healthAlertsEnabledMap[resp.Instances[i].Name] {
-				resp.Instances[i].HealthAlertsEnabled = true
-			}
+			resp.Instances[i].HealthAlertsState = healthAlertsStateMap[resp.Instances[i].Name]
 		}
 	}
 
