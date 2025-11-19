@@ -89,18 +89,18 @@ func TestAddListRemove(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, actual)
 
-	_, err = svc.Add(ctx, "", "", 0, "username", "password")
+	_, err = svc.Add(ctx, "", "", 0, "username", "password", nil)
 	tests.AssertGRPCError(t, status.New(codes.InvalidArgument, `PostgreSQL instance host is not given.`), err)
 
-	_, err = svc.Add(ctx, "", " ", 0, "username", "password")
+	_, err = svc.Add(ctx, "", " ", 0, "username", "password", nil)
 	tests.AssertGRPCError(t, status.New(codes.InvalidArgument, `PostgreSQL instance host is not given.`), err)
 
 	supervisor.On("Start", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Stop", mock.Anything, mock.Anything).Return(nil)
-	id, err := svc.Add(ctx, "", "localhost", 0, "username", "password")
+	id, err := svc.Add(ctx, "", "localhost", 0, "username", "password", nil)
 	assert.NoError(t, err)
 
-	_, err = svc.Add(ctx, "", "localhost", 5432, "username", "password")
+	_, err = svc.Add(ctx, "", "localhost", 5432, "username", "password", nil)
 	tests.AssertGRPCError(t, status.New(codes.AlreadyExists, `PostgreSQL instance "localhost" already exists.`), err)
 
 	actual, err = svc.List(ctx)
@@ -155,7 +155,7 @@ func TestRestore(t *testing.T) {
 	supervisor.On("Start", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Status", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Stop", mock.Anything, mock.Anything).Return(nil)
-	_, err = svc.Add(ctx, "", "localhost", 5432, "username", "password")
+	_, err = svc.Add(ctx, "", "localhost", 5432, "username", "password", nil)
 	assert.NoError(t, err)
 
 	// Restore should succeed.
