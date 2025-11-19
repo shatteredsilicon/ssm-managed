@@ -398,7 +398,7 @@ func (svc *Service) addQanAgent(
 		if node.Type == models.SSMServerNodeType {
 			nodeName = string(node.Type) // ssm-server node uses type as name
 		}
-		if err = svc.QAN.AddMySQL(ctx, nodeName, service, agent, *qanConfig); err != nil {
+		if err = svc.QAN.AddQAN(ctx, nodeName, agent.MySQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
 			return err
 		}
 
@@ -599,9 +599,9 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 				}
 				if svc.QAN != nil {
 					if node.Type == models.SSMServerNodeType {
-						err = svc.QAN.RemoveMySQL(ctx, &a, true)
+						err = svc.QAN.RemoveQAN(ctx, &a, true)
 					} else {
-						err = svc.QAN.RemoveMySQL(ctx, &a, false)
+						err = svc.QAN.RemoveQAN(ctx, &a, false)
 					}
 					if err != nil {
 						return err

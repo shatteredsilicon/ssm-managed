@@ -53,6 +53,8 @@ const (
 	SlowlogCollectFrom = "slowlog"
 	// PerfschemaCollectFrom CollectFrom of performance schema
 	PerfschemaCollectFrom = "perfschema"
+	// PerfschemaCollectFrom CollectFrom of table
+	TableCollectFrom = "table"
 )
 
 // QAN subsystem types
@@ -61,6 +63,7 @@ const (
 	SubsystemAgent
 	SubsystemMySQL
 	SubsystemMongo
+	SubsystemPostgreSQL
 )
 
 // QANCommandError for errors returned by QAN API
@@ -581,9 +584,16 @@ func (svc *Service) sendQANCommand(ctx context.Context, qanURL *url.URL, agentUU
 	return errors.Errorf("%s: failed to send command after %d attempts", command, attempts)
 }
 
-// AddMySQL adds MySQL instance to QAN, configuring and enabling it.
-// It sets MySQL instance UUID to qanAgent.QANDBInstanceUUID.
-func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService *models.MySQLService, qanAgent *models.QanAgent, defaultConfig config.QAN) error {
+// AddQAN adds instance to QAN, configuring and enabling it.
+// It sets instance UUID to qanAgent.QANDBInstanceUUID.
+func (svc *Service) AddQAN(
+	ctx context.Context,
+	nodeName string,
+	dsn string,
+	engineVersion string,
+	qanAgent *models.QanAgent,
+	defaultConfig config.QAN,
+) error {
 	qanURL, err := svc.ensureAgentIsRegistered(ctx)
 	if err != nil {
 		return err
@@ -600,11 +610,11 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	}
 
 	instance := &proto.Instance{
-		Subsystem:  "mysql",
+		Subsystem:  "postgresql",
 		ParentUUID: osUUID,
 		Name:       nodeName,
-		DSN:        sanitizeDSN(qanAgent.DSN(mySQLService)),
-		Version:    *mySQLService.EngineVersion,
+		DSN:        sanitizeDSN(dsn),
+		Version:    engineVersion,
 		Deleted:    qanDeletedTimeZero,
 	}
 	if err = svc.addInstanceToServer(ctx, qanURL, instance); err != nil {
@@ -615,7 +625,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 
 	// we need real DSN (with password) for qan-agent to work, and it seems to be the only way to pass it
 	path := filepath.Join(svc.baseDir, "instance", fmt.Sprintf("%s.json", instance.UUID))
-	instance.DSN = qanAgent.DSN(mySQLService)
+	instance.DSN = dsn
 
 	b, err := json.MarshalIndent(instance, "", "    ")
 	if err != nil {
@@ -653,7 +663,7 @@ func (svc *Service) AddMySQL(ctx context.Context, nodeName string, mySQLService 
 	return svc.sendQANCommand(ctx, qanURL, agentUUID, command, b)
 }
 
-func (svc *Service) RemoveMySQL(ctx context.Context, qanAgent *models.QanAgent, softRemove bool) error {
+func (svc *Service) RemoveQAN(ctx context.Context, qanAgent *models.QanAgent, softRemove bool) error {
 	qanURL, err := svc.ensureAgentIsRegistered(ctx)
 	if err != nil {
 		return err
@@ -778,16 +788,16 @@ FROM (
 	FROM query_global_metrics
 ) qgm
 JOIN instances inst ON qgm.instance_id = inst.instance_id
-WHERE (inst.subsystem_id = ? OR inst.subsystem_id = ?)
+WHERE (inst.subsystem_id = ? OR inst.subsystem_id = ? OR inst.subsystem_id = ?)
 `
 	q2 := `
 SELECT name, uuid, subsystem_id, parent_uuid
 FROM instances
-WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instances.subsystem_id = ?)
+WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instances.subsystem_id = ? OR instances.subsystem_id = ?)
 `
 
-	q1Args := []interface{}{SubsystemMySQL, SubsystemMongo}
-	q2Args := []interface{}{qanDeletedTimeZero, SubsystemMySQL, SubsystemMongo}
+	q1Args := []interface{}{SubsystemMySQL, SubsystemMongo, SubsystemPostgreSQL}
+	q2Args := []interface{}{qanDeletedTimeZero, SubsystemMySQL, SubsystemMongo, SubsystemPostgreSQL}
 	if instanceName != "" {
 		q1 += " AND inst.name = ?"
 		q2 += " AND name = ?"

@@ -32,6 +32,7 @@ import (
 	servicelib "github.com/percona/kardianos-service"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/reform.v1"
@@ -40,8 +41,10 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
+	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
+	"github.com/shatteredsilicon/ssm/proto/config"
 )
 
 const (
@@ -60,6 +63,7 @@ type ServiceConfig struct {
 	Prometheus    *prometheus.Service
 	Supervisor    services.Supervisor
 	DB            *reform.DB
+	QAN           *qan.Service
 	PortsRegistry *ports.Registry
 	Consul        *consul.Client
 }
@@ -216,7 +220,13 @@ func (svc *Service) List(ctx context.Context) ([]Instance, error) {
 }
 
 // Add new postgreSQL service and start postgres_exporter
-func (svc *Service) Add(ctx context.Context, name, address string, port uint32, username, password string) (int32, error) {
+func (svc *Service) Add(
+	ctx context.Context,
+	name, address string,
+	port uint32,
+	username, password string,
+	qanConfig *config.QAN,
+) (int32, error) {
 	address = strings.TrimSpace(address)
 	username = strings.TrimSpace(username)
 	name = strings.TrimSpace(name)
@@ -282,6 +292,9 @@ func (svc *Service) Add(ctx context.Context, name, address string, port uint32, 
 		}
 
 		if err := svc.addPostgresExporter(ctx, tx, service, username, password); err != nil {
+			return err
+		}
+		if err = svc.addQanAgent(ctx, tx, service, node, username, password, qanConfig); err != nil {
 			return err
 		}
 
@@ -499,6 +512,60 @@ func (svc *Service) addPostgresExporter(ctx context.Context, tx *reform.TX, serv
 	return nil
 }
 
+func (svc *Service) addQanAgent(
+	ctx context.Context,
+	tx *reform.TX,
+	service *models.PostgreSQLService,
+	node *models.RemoteNode,
+	username, password string,
+	qanConfig *config.QAN,
+) error {
+	// Despite running a single qan-agent process on PMM Server, we use one database record per MySQL instance
+	// to store username/password and UUID.
+
+	// insert qan-agent agent and association
+	agent := &models.QanAgent{
+		Type:         models.QanAgentAgentType,
+		RunsOnNodeID: svc.ssmServerNode.ID,
+
+		ServiceUsername: &username,
+		ServicePassword: &password,
+		ListenPort:      pointer.ToUint16(models.QanAgentPort),
+	}
+	var err error
+	if err = tx.Insert(agent); err != nil {
+		return errors.WithStack(err)
+	}
+	if err = tx.Insert(&models.AgentService{AgentID: agent.ID, ServiceID: service.ID}); err != nil {
+		return errors.WithStack(err)
+	}
+
+	// DSNs for mysqld_exporter and qan-agent are currently identical,
+	// so we do not check connection again
+
+	// start or reconfigure qan-agent
+	if svc.QAN != nil {
+		if qanConfig == nil {
+			qanConfig = &config.QAN{CollectFrom: qan.TableCollectFrom}
+		}
+
+		nodeName := node.Name
+		if node.Type == models.SSMServerNodeType {
+			nodeName = string(node.Type) // ssm-server node uses type as name
+		}
+		if err = svc.QAN.AddQAN(ctx, nodeName, agent.PostgreSQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
+			return err
+		}
+
+		// re-save agent with set QANDBInstanceUUID
+		if err = tx.Save(agent); err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}
+
 // Restore configuration from database.
 func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 	nodes, err := tx.FindAllFrom(models.RemoteNodeTable, "type", models.RemoteNodeType)
@@ -541,6 +608,34 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					dsn := a.DSN(service)
 					cfg := svc.postgresExporterCfg(a, dsn)
 					if err = svc.Supervisor.Start(ctx, cfg); err != nil {
+						return err
+					}
+				}
+
+			case models.QanAgentAgentType:
+				a := models.QanAgent{ID: agent.ID}
+				if err = tx.Reload(&a); err != nil {
+					return errors.WithStack(err)
+				}
+				if svc.QAN != nil {
+					name := models.NameForSupervisor(a.Type, *a.ListenPort)
+					err := svc.Supervisor.Status(ctx, name)
+					if err == nil {
+						if err = svc.Supervisor.Stop(ctx, name); err != nil {
+							return err
+						}
+					}
+
+					if err = svc.QAN.Restore(ctx, name, a); err != nil {
+						if _, ok := err.(qan.QANCommandError); ok {
+							// if it's a QAN command error, we should have already
+							// restored the qan configs (although may not be perfectly),
+							// one should check what happens on the qan-agent side, ssm-managed
+							// should just continue on.
+							logrus.WithField("component", "rds").Warnf("Got a QAN API error when restoring qan for %s: %s\n", node.Name, err.Error())
+							return nil
+						}
+
 						return err
 					}
 				}

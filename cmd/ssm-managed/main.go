@@ -356,6 +356,7 @@ func makePostgreSQLService(ctx context.Context, deps *serviceDependencies, consu
 		Prometheus:    deps.prometheus,
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
+		QAN:           deps.qan,
 		PortsRegistry: deps.portsRegistry,
 		Consul:        consul,
 	}
