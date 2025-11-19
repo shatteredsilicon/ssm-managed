@@ -45,6 +45,7 @@ const (
 	PostgresExporterAgentType       AgentType = "postgres_exporter"
 	RDSExporterAgentType            AgentType = "rds_exporter"
 	QanAgentAgentType               AgentType = "qan-agent"
+	PostgresQanAgentAgentType       AgentType = "postgres-qan-agent"
 	NodeExporterAgentType           AgentType = "node_exporter"
 	ProxySQLExporterAgentType       AgentType = "proxysql_exporter"
 	MongoDBExporterAgentType        AgentType = "mongodb_exporter"
@@ -55,6 +56,7 @@ const (
 	ClientMongoDBExporterAgentType  AgentType = "mongodb:metrics"
 	ClientMongoDBQanAgentAgentType  AgentType = "mongodb:queries"
 	ClientPostgresExporterAgentType AgentType = "postgresql:metrics"
+	ClientPostgresQanAgentAgentType AgentType = "postgresql:queries"
 	ClientProxySQLExporterAgentType AgentType = "proxysql:metrics"
 
 	QanAgentPort    uint16 = 9000
@@ -193,7 +195,7 @@ type FullAgent struct {
 	MySQLDisableTablestats *bool   `reform:"mysql_disable_tablestats"`
 }
 
-func (q *QanAgent) DSN(service *MySQLService) string {
+func (q *QanAgent) MySQLDSN(service *MySQLService) string {
 	cfg := mysql.NewConfig()
 	cfg.User = *q.ServiceUsername
 	cfg.Passwd = *q.ServicePassword
@@ -213,6 +215,13 @@ func (q *QanAgent) DSN(service *MySQLService) string {
 	// TODO TLSConfig: "true", https://jira.percona.com/browse/PMM-1727
 	// TODO Other parameters?
 	return cfg.FormatDSN()
+}
+
+func (q *QanAgent) PostgreSQLDSN(service *PostgreSQLService) string {
+	return (&PostgresExporter{
+		ServiceUsername: q.ServiceUsername,
+		ServicePassword: q.ServicePassword,
+	}).DSN(service)
 }
 
 // SNMPExporter exports SNMP metrics.

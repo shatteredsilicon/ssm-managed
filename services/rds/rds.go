@@ -698,7 +698,8 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
-		if err = svc.QAN.AddMySQL(ctx, node.Name, svc.MySQLServiceFromRDSService(service), agent, config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}); err != nil {
+		service := svc.MySQLServiceFromRDSService(service)
+		if err = svc.QAN.AddQAN(ctx, node.Name, agent.MySQLDSN(service), *service.EngineVersion, agent, config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}); err != nil {
 			return err
 		}
 
@@ -920,7 +921,7 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 				}
 				if svc.QAN != nil {
 					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-					if err = svc.QAN.RemoveMySQL(ctx, &a, false); err != nil {
+					if err = svc.QAN.RemoveQAN(ctx, &a, false); err != nil {
 						return err
 					}
 				}

@@ -57,7 +57,7 @@ func (s *PostgreSQLServer) List(ctx context.Context, req *api.PostgreSQLListRequ
 // Add adds new PostgreSQL instance.
 func (s *PostgreSQLServer) Add(ctx context.Context, req *api.PostgreSQLAddRequest) (*api.PostgreSQLAddResponse, error) {
 
-	id, err := s.PostgreSQL.Add(ctx, req.Name, req.Address, req.Port, req.Username, req.Password)
+	id, err := s.PostgreSQL.Add(ctx, req.Name, req.Address, req.Port, req.Username, req.Password, nil)
 	if err != nil {
 		logger.Get(ctx).Errorf("%+v", err)
 		return nil, err

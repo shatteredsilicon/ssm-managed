@@ -94,7 +94,7 @@ func TestList(t *testing.T) {
 
 	supervisor.On("Start", mock.Anything, mock.Anything).Return(nil)
 	supervisor.On("Stop", mock.Anything, mock.Anything).Return(nil)
-	id, err := postgreSQLService.Add(ctx, "", "localhost", 5432, "username", "password")
+	id, err := postgreSQLService.Add(ctx, "", "localhost", 5432, "username", "password", nil)
 	assert.NoError(t, err)
 
 	actual, err = svc.List(ctx)

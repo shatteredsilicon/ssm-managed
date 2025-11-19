@@ -291,6 +291,7 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		models.QanAgentAgentType,
 		models.ClientMySQLQanAgentAgentType,
 		models.ClientMongoDBQanAgentAgentType,
+		models.ClientPostgresQanAgentAgentType,
 	}, models.AgentType(service)) {
 		return nil
 	}
@@ -299,6 +300,8 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		subsystemID = qan.SubsystemMySQL
 	} else if service == string(models.ClientMongoDBQanAgentAgentType) {
 		subsystemID = qan.SubsystemMongo
+	} else if service == string(models.ClientPostgresQanAgentAgentType) || service == string(models.PostgresQanAgentAgentType) {
+		subsystemID = qan.SubsystemPostgreSQL
 	}
 
 	if subsystemID == 0 {
@@ -391,6 +394,10 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 	}
 
 	return svc.db.InTransaction(func(tx *reform.TX) error {
+		if service == string(models.PostgresQanAgentAgentType) {
+			service = string(models.QanAgentAgentType)
+		}
+
 		agentService, err := models.AgentServiceByName(tx.Querier, nodeName, service)
 		if err != nil {
 			return errors.WithStack(err)
@@ -480,7 +487,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			}
 			if svc.qan != nil {
 				<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-				if err = svc.qan.RemoveMySQL(ctx, &a, false); err != nil {
+				if err = svc.qan.RemoveQAN(ctx, &a, false); err != nil {
 					return err
 				}
 			}
@@ -690,7 +697,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 				}
 				if svc.qan != nil {
 					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-					if err = svc.qan.RemoveMySQL(ctx, &a, false); err != nil {
+					if err = svc.qan.RemoveQAN(ctx, &a, false); err != nil {
 						return err
 					}
 				}
