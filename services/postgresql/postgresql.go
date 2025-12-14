@@ -291,7 +291,7 @@ func (svc *Service) Add(
 			return errors.WithStack(err)
 		}
 
-		if err := svc.addPostgresExporter(ctx, tx, service, username, password); err != nil {
+		if err := svc.AddPostgresExporter(ctx, tx, service, username, password); err != nil {
 			return err
 		}
 		if err = svc.addQanAgent(ctx, tx, service, node, username, password, qanConfig); err != nil {
@@ -458,7 +458,7 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 	})
 }
 
-func (svc *Service) addPostgresExporter(ctx context.Context, tx *reform.TX, service *models.PostgreSQLService, username, password string) error {
+func (svc *Service) AddPostgresExporter(ctx context.Context, tx *reform.TX, service *models.PostgreSQLService, username, password string) error {
 	// insert postgres_exporter agent and association
 	port, err := svc.PortsRegistry.Reserve()
 	if err != nil {
@@ -479,17 +479,15 @@ func (svc *Service) addPostgresExporter(ctx context.Context, tx *reform.TX, serv
 		return errors.WithStack(err)
 	}
 
-	// check connection and a number of tables
-	var tableCount int
+	// check connection
 	dsn := agent.DSN(service)
 	db, err := sql.Open("postgres", dsn)
-	if err == nil {
-		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
-		err = db.QueryRowContext(sqlCtx, "SELECT COUNT(*) FROM information_schema.tables").Scan(&tableCount)
-		cancel()
-		db.Close()
-	}
 	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer db.Close()
+
+	if err = db.Ping(); err != nil {
 		if err, ok := err.(*pq.Error); ok {
 			switch err.Code {
 			case "42501":
@@ -503,7 +501,7 @@ func (svc *Service) addPostgresExporter(ctx context.Context, tx *reform.TX, serv
 
 	// start postgres_exporter agent
 	if svc.PostgresExporterPath != "" {
-		cfg := svc.postgresExporterCfg(agent, dsn)
+		cfg := svc.PostgresExporterCfg(agent, dsn)
 		if err = svc.Supervisor.Start(ctx, cfg); err != nil {
 			return err
 		}
@@ -606,7 +604,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					}
 
 					dsn := a.DSN(service)
-					cfg := svc.postgresExporterCfg(a, dsn)
+					cfg := svc.PostgresExporterCfg(a, dsn)
 					if err = svc.Supervisor.Start(ctx, cfg); err != nil {
 						return err
 					}
@@ -646,7 +644,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 	return nil
 }
 
-func (svc *Service) postgresExporterCfg(agent *models.PostgresExporter, dsn string) *servicelib.Config {
+func (svc *Service) PostgresExporterCfg(agent *models.PostgresExporter, dsn string) *servicelib.Config {
 	name := models.NameForSupervisor(agent.Type, *agent.ListenPort)
 
 	arguments := []string{

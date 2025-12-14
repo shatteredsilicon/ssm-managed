@@ -55,6 +55,8 @@ const (
 	PerfschemaCollectFrom = "perfschema"
 	// PerfschemaCollectFrom CollectFrom of table
 	TableCollectFrom = "table"
+	// RDSLogfileCollectForm CollectFrom of rds log file
+	RDSLogfileCollectForm = "rds-logfile"
 )
 
 // QAN subsystem types

@@ -106,9 +106,6 @@ func (s *NodeServer) putRemoteNodes(nodes []remote.FullInstance, respNodes []*ap
 				Engine:        *db.Service.Engine,
 				EngineVersion: *db.Service.EngineVersion,
 			}
-			if db.Service.Type == models.PostgreSQLServiceType && agent.Type == models.QanAgentAgentType {
-				services[i].Type = string(models.PostgresQanAgentAgentType)
-			}
 		}
 
 		found := false
@@ -179,9 +176,6 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 		if node.OSName == string(models.SSMServerNodeType) {
 			nis.Region = string(models.RemoteNodeRegion)
 			nis.Type = string(models.QanAgentAgentType)
-			if node.SubsystemID == qan.SubsystemPostgreSQL {
-				nis.Type = string(models.PostgresQanAgentAgentType)
-			}
 		} else {
 			nis.Region = string(models.ClientNodeRegion)
 			nis.Type = string(models.ClientMySQLQanAgentAgentType)
@@ -210,7 +204,7 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 					service.State = nis.State
 					serviceExists = true
 					break
-				} else if node.SubsystemID == qan.SubsystemPostgreSQL && (service.Type == string(models.PostgresQanAgentAgentType) ||
+				} else if node.SubsystemID == qan.SubsystemPostgreSQL && (service.Type == string(models.QanAgentAgentType) ||
 					service.Type == string(models.ClientPostgresQanAgentAgentType)) {
 					service.State = nis.State
 					serviceExists = true

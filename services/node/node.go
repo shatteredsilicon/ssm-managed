@@ -296,7 +296,7 @@ func (svc *Service) removeServiceFromConsul(ctx context.Context, nodeID, name st
 }
 
 func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service string) error {
-	var subsystemID int
+	var subsystemIDs []int
 
 	// server-side qan agent
 	if !utils.SliceContains([]models.AgentType{
@@ -308,15 +308,17 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		return nil
 	}
 
-	if service == string(models.ClientMySQLQanAgentAgentType) || service == string(models.QanAgentAgentType) {
-		subsystemID = qan.SubsystemMySQL
+	if service == string(models.ClientMySQLQanAgentAgentType) {
+		subsystemIDs = []int{qan.SubsystemMySQL}
 	} else if service == string(models.ClientMongoDBQanAgentAgentType) {
-		subsystemID = qan.SubsystemMongo
-	} else if service == string(models.ClientPostgresQanAgentAgentType) || service == string(models.PostgresQanAgentAgentType) {
-		subsystemID = qan.SubsystemPostgreSQL
+		subsystemIDs = []int{qan.SubsystemMongo}
+	} else if service == string(models.ClientPostgresQanAgentAgentType) {
+		subsystemIDs = []int{qan.SubsystemPostgreSQL}
+	} else if service == string(models.QanAgentAgentType) {
+		subsystemIDs = []int{qan.SubsystemMySQL, qan.SubsystemPostgreSQL}
 	}
 
-	if subsystemID == 0 {
+	if len(subsystemIDs) == 0 {
 		// unknown qan service
 		return nil
 	}
@@ -336,7 +338,7 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		}
 
 		// not target
-		if node.SubsystemID != subsystemID {
+		if !utils.SliceContains(subsystemIDs, node.SubsystemID) {
 			continue
 		}
 
@@ -406,10 +408,6 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 	}
 
 	return svc.db.InTransaction(func(tx *reform.TX) error {
-		if service == string(models.PostgresQanAgentAgentType) {
-			service = string(models.QanAgentAgentType)
-		}
-
 		agentService, err := models.AgentServiceByName(tx.Querier, nodeName, service)
 		if err != nil {
 			return errors.WithStack(err)
