@@ -55,6 +55,10 @@ type RDSService struct {
 	EngineVersion *string `reform:"engine_version"`
 }
 
+func (svc *RDSService) IsPg() bool {
+	return svc != nil && svc.Engine != nil && strings.Contains(strings.ToLower(*svc.Engine), "postgres")
+}
+
 //reform:services
 type RDSServiceDetail struct {
 	RDSService

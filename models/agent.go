@@ -45,7 +45,6 @@ const (
 	PostgresExporterAgentType       AgentType = "postgres_exporter"
 	RDSExporterAgentType            AgentType = "rds_exporter"
 	QanAgentAgentType               AgentType = "qan-agent"
-	PostgresQanAgentAgentType       AgentType = "postgres-qan-agent"
 	NodeExporterAgentType           AgentType = "node_exporter"
 	ProxySQLExporterAgentType       AgentType = "proxysql_exporter"
 	MongoDBExporterAgentType        AgentType = "mongodb_exporter"
