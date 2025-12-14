@@ -46,6 +46,7 @@ import (
 
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
+	pgService "github.com/shatteredsilicon/ssm-managed/services/postgresql"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/utils"
@@ -60,11 +61,13 @@ const (
 )
 
 type ServiceConfig struct {
-	MySQLdExporterPath    string
-	RDSExporterPath       string
-	RDSExporterConfigPath string
+	MySQLdExporterPath     string
+	PostgreSQLExporterPath string
+	RDSExporterPath        string
+	RDSExporterConfigPath  string
 
 	Prometheus    *prometheus.Service
+	PostgreSQL    *pgService.Service
 	Supervisor    services.Supervisor
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
@@ -198,6 +201,24 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 		MetricsPath:    "/enhanced",
 		HonorLabels:    true,
 	}
+	rdsPostgreSQL := &prometheus.ScrapeConfig{
+		JobName:        "rds-postgresql",
+		ScrapeInterval: "1s",
+		ScrapeTimeout:  "1s",
+		MetricsPath:    "/metrics",
+		RelabelConfigs: []prometheus.RelabelConfig{{
+			TargetLabel: "job",
+			Replacement: "postgresql",
+		}},
+		MetricRelabelConfigs: []prometheus.RelabelConfig{
+			{
+				SourceLabels: []model.LabelName{"__name__"},
+				TargetLabel:  "__name__",
+				Regex:        "(pg_stat_database_xact_commit|pg_stat_database_xact_rollback|pg_stat_database_temp_bytes|pg_stat_database_deadlocks|pg_stat_database_conflicts|pg_stat_database_blk_read_time|pg_stat_database_blk_write_time|pg_stat_bgwriter_buffers_alloc|pg_stat_bgwriter_checkpoint_write_time|pg_stat_bgwriter_checkpoint_sync_time|pg_stat_database_conflicts_confl_tablespace|pg_stat_database_conflicts_confl_snapshot|pg_stat_database_conflicts_confl_lock|pg_stat_database_conflicts_confl_deadlock|pg_stat_database_conflicts_confl_bufferpin|pg_stat_bgwriter_buffers_checkpoint|pg_stat_bgwriter_buffers_clean|pg_stat_bgwriter_buffers_backend|pg_stat_bgwriter_buffers_backend_fsync|pg_stat_database_tup_fetched|pg_stat_database_tup_returned|pg_stat_database_tup_inserted|pg_stat_database_tup_updated|pg_stat_database_tup_deleted)",
+				Replacement:  "${1}_total",
+			},
+		},
+	}
 
 	awsRegionLabelValues, err := svc.Prometheus.GetLabelValues("aws_region")
 	if err != nil {
@@ -251,6 +272,19 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 				rdsMySQLMR.StaticConfigs = append(rdsMySQLMR.StaticConfigs, sc)
 				rdsMySQLLR.StaticConfigs = append(rdsMySQLLR.StaticConfigs, sc)
 
+			case models.PostgresExporterAgentType:
+				a := models.PostgresExporter{ID: agent.ID}
+				if e := q.Reload(&a); e != nil {
+					return errors.WithStack(e)
+				}
+				logger.Get(ctx).WithField("component", "rds").Infof("%s %s %s %d", a.Type, node.Name, node.Region, *a.ListenPort)
+
+				sc := prometheus.StaticConfig{
+					Targets: []string{fmt.Sprintf("127.0.0.1:%d", *a.ListenPort)},
+					Labels:  commonLabels,
+				}
+				rdsPostgreSQL.StaticConfigs = append(rdsPostgreSQL.StaticConfigs, sc)
+
 			case models.RDSExporterAgentType:
 				a := models.RDSExporter{ID: agent.ID}
 				if e := q.Reload(&a); e != nil {
@@ -282,8 +316,9 @@ func (svc *Service) ApplyPrometheusConfiguration(ctx context.Context, q *reform.
 	sort.Slice(rdsMySQLLR.StaticConfigs, sorterFor(rdsMySQLLR.StaticConfigs))
 	sort.Slice(rdsBasic.StaticConfigs, sorterFor(rdsBasic.StaticConfigs))
 	sort.Slice(rdsEnhanced.StaticConfigs, sorterFor(rdsEnhanced.StaticConfigs))
+	sort.Slice(rdsPostgreSQL.StaticConfigs, sorterFor(rdsPostgreSQL.StaticConfigs))
 
-	return svc.Prometheus.SetScrapeConfigs(ctx, false, rdsMySQLHR, rdsMySQLMR, rdsMySQLLR, rdsBasic, rdsEnhanced)
+	return svc.Prometheus.SetScrapeConfigs(ctx, false, rdsMySQLHR, rdsMySQLMR, rdsMySQLLR, rdsBasic, rdsEnhanced, rdsPostgreSQL)
 }
 
 func (svc *Service) Discover(ctx context.Context, accessKey, secretKey string) ([]Instance, error) {
@@ -592,12 +627,6 @@ func (svc *Service) UpdateRDSExporterConfig(tx *reform.TX, excludeNodes ...strin
 			AWSAccessKey: service.AWSAccessKey,
 			AWSSecretKey: service.AWSSecretKey,
 		}
-		switch *service.Engine {
-		case "aurora":
-			instance.Type = auroraMySQL
-		case "mysql":
-			instance.Type = mySQL
-		}
 		config.Instances = append(config.Instances, instance)
 	}
 	sort.Slice(config.Instances, func(i, j int) bool {
@@ -693,20 +722,29 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 		return errors.WithStack(err)
 	}
 
+	if svc.QAN == nil {
+		return nil
+	}
+
 	// DSNs for mysqld_exporter and qan-agent are currently identical,
 	// so we do not check connection again
 
 	// start or reconfigure qan-agent
-	if svc.QAN != nil {
-		service := svc.MySQLServiceFromRDSService(service)
-		if err = svc.QAN.AddQAN(ctx, node.Name, agent.MySQLDSN(service), *service.EngineVersion, agent, config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}); err != nil {
+	if service.IsPg() {
+		s := svc.PostgreSQLServiceFromRDSService(service)
+		if err = svc.QAN.AddQAN(ctx, node.Name, agent.PostgreSQLDSN(s), *service.EngineVersion, agent, config.QAN{CollectFrom: qan.RDSLogfileCollectForm}); err != nil {
 			return err
 		}
-
-		// re-save agent with set QANDBInstanceUUID
-		if err = tx.Save(agent); err != nil {
-			return errors.WithStack(err)
+	} else {
+		s := svc.MySQLServiceFromRDSService(service)
+		if err = svc.QAN.AddQAN(ctx, node.Name, agent.MySQLDSN(s), *service.EngineVersion, agent, config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}); err != nil {
+			return err
 		}
+	}
+
+	// re-save agent with set QANDBInstanceUUID
+	if err = tx.Save(agent); err != nil {
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -714,6 +752,19 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 
 func (svc *Service) MySQLServiceFromRDSService(service *models.RDSService) *models.MySQLService {
 	return &models.MySQLService{
+		ID:     service.ID,
+		Type:   service.Type,
+		NodeID: service.NodeID,
+
+		Address:       service.Address,
+		Port:          service.Port,
+		Engine:        service.Engine,
+		EngineVersion: service.EngineVersion,
+	}
+}
+
+func (svc *Service) PostgreSQLServiceFromRDSService(service *models.RDSService) *models.PostgreSQLService {
+	return &models.PostgreSQLService{
 		ID:     service.ID,
 		Type:   service.Type,
 		NodeID: service.NodeID,
@@ -793,9 +844,16 @@ func (svc *Service) Add(ctx context.Context, accessKey, secretKey string, id *In
 			return errors.WithStack(err)
 		}
 
-		if err = svc.addMySQLdExporter(ctx, tx, service, username, password); err != nil {
-			return err
+		if service.IsPg() {
+			if err = svc.PostgreSQL.AddPostgresExporter(ctx, tx, svc.PostgreSQLServiceFromRDSService(service), username, password); err != nil {
+				return err
+			}
+		} else {
+			if err = svc.addMySQLdExporter(ctx, tx, service, username, password); err != nil {
+				return err
+			}
 		}
+
 		if err = svc.addRDSExporter(ctx, tx, service, node); err != nil {
 			return err
 		}
@@ -878,6 +936,17 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 					return errors.WithStack(err)
 				}
 				if svc.MySQLdExporterPath != "" {
+					if err = svc.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+						return err
+					}
+				}
+
+			case models.PostgresExporterAgentType:
+				a := models.PostgresExporter{ID: agent.ID}
+				if err = tx.Reload(&a); err != nil {
+					return errors.WithStack(err)
+				}
+				if svc.PostgreSQLExporterPath != "" {
 					if err = svc.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
 						return err
 					}
@@ -1002,6 +1071,28 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 
 					dsn := a.DSN(svc.MySQLServiceFromRDSService(service))
 					cfg := svc.mysqlExporterCfg(a, dsn)
+					if err = svc.Supervisor.Start(ctx, cfg); err != nil {
+						return err
+					}
+				}
+
+			case models.PostgresExporterAgentType:
+				a := &models.PostgresExporter{ID: agent.ID}
+				if err = tx.Reload(a); err != nil {
+					return errors.WithStack(err)
+				}
+				if svc.MySQLdExporterPath != "" {
+					name := models.NameForSupervisor(a.Type, *a.ListenPort)
+
+					err := svc.Supervisor.Status(ctx, name)
+					if err == nil {
+						if err = svc.Supervisor.Stop(ctx, name); err != nil {
+							return err
+						}
+					}
+
+					dsn := a.DSN(svc.PostgreSQLServiceFromRDSService(service))
+					cfg := svc.PostgreSQL.PostgresExporterCfg(a, dsn)
 					if err = svc.Supervisor.Start(ctx, cfg); err != nil {
 						return err
 					}

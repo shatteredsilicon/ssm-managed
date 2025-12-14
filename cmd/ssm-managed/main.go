@@ -248,13 +248,15 @@ type serviceDependencies struct {
 	qan           *qan.Service
 }
 
-func makeRDSService(ctx context.Context, deps *serviceDependencies) (*rds.Service, error) {
+func makeRDSService(ctx context.Context, deps *serviceDependencies, postgres *postgresql.Service) (*rds.Service, error) {
 	rdsConfig := rds.ServiceConfig{
-		MySQLdExporterPath:    *agentMySQLdExporterF,
-		RDSExporterPath:       *agentRDSExporterF,
-		RDSExporterConfigPath: *agentRDSExporterConfigF,
+		MySQLdExporterPath:     *agentMySQLdExporterF,
+		PostgreSQLExporterPath: *agentPostgresExporterF,
+		RDSExporterPath:        *agentRDSExporterF,
+		RDSExporterConfigPath:  *agentRDSExporterConfigF,
 
 		Prometheus:    deps.prometheus,
+		PostgreSQL:    postgres,
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
@@ -699,11 +701,6 @@ func main() {
 		portsRegistry: portsRegistry,
 	}
 
-	rds, err := makeRDSService(ctx, deps)
-	if err != nil {
-		l.Panicf("RDS service problem: %+v", err)
-	}
-
 	mysqlService, err := makeMySQLService(ctx, deps, consulClient)
 	if err != nil {
 		l.Panicf("MySQL service problem: %+v", err)
@@ -724,6 +721,11 @@ func main() {
 	postgres, err := makePostgreSQLService(ctx, deps, consulClient)
 	if err != nil {
 		l.Panicf("PostgreSQL service problem: %+v", err)
+	}
+
+	rds, err := makeRDSService(ctx, deps, postgres)
+	if err != nil {
+		l.Panicf("RDS service problem: %+v", err)
 	}
 
 	snmp, err := makeSNMPService(ctx, deps, consulClient)
