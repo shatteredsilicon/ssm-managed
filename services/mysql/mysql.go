@@ -50,6 +50,16 @@ const (
 	defaultMySQLPort uint32 = 3306
 )
 
+var (
+	DefaultSSMServerQANConfig = config.QAN{
+		CollectFrom: qan.SlowlogCollectFrom,
+		FilterAllow: []string{"SELECT", "DELETE"},
+	}
+	defaultRemoteQANConfig = config.QAN{
+		CollectFrom: qan.PerfschemaCollectFrom,
+	}
+)
+
 var versionRegexp = regexp.MustCompile(`([\d\.]+)-.*`)
 
 type ServiceConfig struct {
@@ -391,14 +401,14 @@ func (svc *Service) addQanAgent(
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
 		if qanConfig == nil {
-			qanConfig = &config.QAN{CollectFrom: qan.PerfschemaCollectFrom}
+			qanConfig = &defaultRemoteQANConfig
 		}
 
 		nodeName := node.Name
 		if node.Type == models.SSMServerNodeType {
 			nodeName = string(node.Type) // ssm-server node uses type as name
 		}
-		if err = svc.QAN.AddQAN(ctx, nodeName, agent.MySQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
+		if err = svc.QAN.AddQAN(ctx, nodeName, "mysql", agent.MySQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
 			return err
 		}
 
@@ -696,7 +706,12 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						}
 					}
 
-					if err = svc.QAN.Restore(ctx, name, a); err != nil {
+					qanConfig := defaultRemoteQANConfig
+					if node.Type == models.SSMServerNodeType {
+						qanConfig = DefaultSSMServerQANConfig
+					}
+
+					if err = svc.QAN.Restore(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "mysql"}, qanConfig); err != nil {
 						if _, ok := err.(qan.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),
