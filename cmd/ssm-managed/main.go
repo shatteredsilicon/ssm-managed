@@ -41,7 +41,6 @@ import (
 	prometheusapi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/revel/config"
-	pc "github.com/shatteredsilicon/ssm/proto/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/net/proxy"
@@ -212,10 +211,7 @@ func makeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSv
 		*internalDBPasswordF,
 		models.SSMServerNodeType,
 		"",
-		&pc.QAN{
-			CollectFrom: qan.SlowlogCollectFrom,
-			FilterAllow: []string{"SELECT", "DELETE"},
-		},
+		&mysql.DefaultSSMServerQANConfig,
 	)
 	return errors.WithStack(err)
 }

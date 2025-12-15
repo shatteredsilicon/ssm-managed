@@ -60,6 +60,11 @@ const (
 	awsDiscoverTimeout = 7 * time.Second
 )
 
+var (
+	defaultMySQLQANConfig      = config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}
+	defaultPostgreSQLQANConfig = config.QAN{CollectFrom: qan.RDSLogfileCollectForm}
+)
+
 type ServiceConfig struct {
 	MySQLdExporterPath     string
 	PostgreSQLExporterPath string
@@ -732,12 +737,12 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	// start or reconfigure qan-agent
 	if service.IsPg() {
 		s := svc.PostgreSQLServiceFromRDSService(service)
-		if err = svc.QAN.AddQAN(ctx, node.Name, agent.PostgreSQLDSN(s), *service.EngineVersion, agent, config.QAN{CollectFrom: qan.RDSLogfileCollectForm}); err != nil {
+		if err = svc.QAN.AddQAN(ctx, node.Name, "postgresql", agent.PostgreSQLDSN(s), *service.EngineVersion, agent, defaultPostgreSQLQANConfig); err != nil {
 			return err
 		}
 	} else {
 		s := svc.MySQLServiceFromRDSService(service)
-		if err = svc.QAN.AddQAN(ctx, node.Name, agent.MySQLDSN(s), *service.EngineVersion, agent, config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}); err != nil {
+		if err = svc.QAN.AddQAN(ctx, node.Name, "mysql", agent.MySQLDSN(s), *service.EngineVersion, agent, defaultMySQLQANConfig); err != nil {
 			return err
 		}
 	}
@@ -1052,6 +1057,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 		if err != nil {
 			return err
 		}
+
 		for _, agent := range agents {
 			switch agent.Type {
 			case models.MySQLdExporterAgentType:
@@ -1140,8 +1146,19 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						}
 					}
 
+					// check underlying subsystem (mysql or postgresql) of RDS instance
+					qanAgentSubsystem := "mysql"
+					defaultQANConfig := defaultMySQLQANConfig
+					for i := range agents {
+						if agents[i].Type == models.PostgresExporterAgentType {
+							qanAgentSubsystem = "postgresql"
+							defaultQANConfig = defaultPostgreSQLQANConfig
+							break
+						}
+					}
+
 					// Installs new version of the script.
-					if err = svc.QAN.Restore(ctx, name, a); err != nil {
+					if err = svc.QAN.Restore(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: qanAgentSubsystem}, defaultQANConfig); err != nil {
 						if _, ok := err.(qan.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),

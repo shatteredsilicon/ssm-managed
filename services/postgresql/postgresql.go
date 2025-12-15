@@ -57,6 +57,8 @@ var (
 	cockroachDBRegexp = regexp.MustCompile(`CockroachDB CCL (v[\d\.]+)`)
 )
 
+var defaultRemoteQANConfig = config.QAN{CollectFrom: qan.TableCollectFrom}
+
 type ServiceConfig struct {
 	PostgresExporterPath string
 
@@ -544,14 +546,14 @@ func (svc *Service) addQanAgent(
 	// start or reconfigure qan-agent
 	if svc.QAN != nil {
 		if qanConfig == nil {
-			qanConfig = &config.QAN{CollectFrom: qan.TableCollectFrom}
+			qanConfig = &defaultRemoteQANConfig
 		}
 
 		nodeName := node.Name
 		if node.Type == models.SSMServerNodeType {
 			nodeName = string(node.Type) // ssm-server node uses type as name
 		}
-		if err = svc.QAN.AddQAN(ctx, nodeName, agent.PostgreSQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
+		if err = svc.QAN.AddQAN(ctx, nodeName, "postgresql", agent.PostgreSQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
 			return err
 		}
 
@@ -624,7 +626,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						}
 					}
 
-					if err = svc.QAN.Restore(ctx, name, a); err != nil {
+					if err = svc.QAN.Restore(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "postgresql"}, defaultRemoteQANConfig); err != nil {
 						if _, ok := err.(qan.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),
