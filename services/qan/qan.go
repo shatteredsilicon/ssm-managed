@@ -177,10 +177,15 @@ func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor strin
 }
 
 // Restore ensures that agent is registered and running.
-func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent models.QanAgent) error {
+func (svc *Service) Restore(
+	ctx context.Context,
+	nameForSupervisor string,
+	agent models.QanAgentWithSubsystem,
+	defaultConfig config.QAN,
+) error {
 	l := logger.Get(ctx).WithField("component", "qan")
 
-	_, _, err := svc.restoreConfigs(ctx, models.QanAgentWithServiceType{QanAgent: agent})
+	_, _, err := svc.restoreConfigs(ctx, agent, defaultConfig)
 	if err != nil {
 		l.Infof("restoreConfigs err: %v", err)
 		return err
@@ -193,7 +198,11 @@ func (svc *Service) Restore(ctx context.Context, nameForSupervisor string, agent
 	return nil
 }
 
-func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWithServiceType) (*proto.Instance, *proto.Instance, error) {
+func (svc *Service) restoreConfigs(
+	ctx context.Context,
+	agent models.QanAgentWithSubsystem,
+	defaultConfig config.QAN,
+) (*proto.Instance, *proto.Instance, error) {
 	l := logger.Get(ctx).WithField("component", "qan")
 
 	qanURL, err := getQanURL(ctx)
@@ -215,12 +224,22 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 		dbInstance    proto.Instance
 	)
 
-	// look for mysql instance
+	// look for db instance
 	for _, inst := range instances {
 		if inst.UUID == *agent.QANDBInstanceUUID {
 			dbInstance = inst
 			break
 		}
+	}
+
+	// fix qan agent type if it doesn't match
+	updateDBInstanceCfg := false
+	if dbInstance.Subsystem != "" && dbInstance.Subsystem != agent.Subsystem {
+		dbInstance.Subsystem = agent.Subsystem
+		if err = svc.updateInstance(ctx, qanURL, &dbInstance); err != nil {
+			return nil, nil, errors.Wrap(err, "failed to update QAN instance by UUID")
+		}
+		updateDBInstanceCfg = true
 	}
 
 	// look for related agent and os instances
@@ -241,7 +260,7 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 
 	// restore db instance.
 	path = filepath.Join(svc.baseDir, "instance", fmt.Sprintf("%s.json", dbInstance.UUID))
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); os.IsNotExist(err) || updateDBInstanceCfg {
 		dbInstance.DSN = strings.Replace(dbInstance.DSN, "***", *agent.ServicePassword, 1)
 		dbInstance.DSN = fmt.Sprintf("%s/?timeout=5s", dbInstance.DSN)
 		dbInstanceJSON, err := json.MarshalIndent(dbInstance, "", "    ")
@@ -342,8 +361,28 @@ func (svc *Service) restoreConfigs(ctx context.Context, agent models.QanAgentWit
 	path = filepath.Join(svc.baseDir, "config", fmt.Sprintf("qan-%s.conf", dbInstance.UUID))
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		qanConfig, err := svc.getQANConfig(ctx, qanURL, dbInstance.UUID)
-		if err != nil || qanConfig == nil {
+		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to get qan config from QAN API")
+		}
+
+		if qanConfig == nil {
+			exampleQueries := true
+			c := config.QAN{
+				UUID:           dbInstance.UUID,
+				CollectFrom:    defaultConfig.CollectFrom,
+				Interval:       60,
+				ExampleQueries: &exampleQueries,
+				FilterAllow:    defaultConfig.FilterAllow,
+			}
+			if os.Getenv("QAN_FILTER_OMIT") != "" {
+				c.FilterOmit = strings.Split(os.Getenv("QAN_FILTER_OMIT"), ",")
+			}
+			cBytes, _ := json.Marshal(c)
+			qanConfig = &config.RunningQAN{
+				AgentUUID:     agentInstance.UUID,
+				SetConfig:     string(cBytes),
+				RunningConfig: string(cBytes),
+			}
 		}
 
 		if err = os.WriteFile(path, []byte(qanConfig.RunningConfig), 0666); err != nil {
@@ -494,6 +533,42 @@ func (svc *Service) addInstanceToServer(ctx context.Context, qanURL *url.URL, in
 	return nil
 }
 
+func (svc *Service) updateInstance(ctx context.Context, qanURL *url.URL, instance *proto.Instance) error {
+	b, err := json.Marshal(instance)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	url := *qanURL
+	url.Path = path.Join(url.Path, "instances", instance.UUID)
+	req, err := http.NewRequest("PUT", url.String(), bytes.NewReader(b))
+
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	rb, _ := httputil.DumpRequestOut(req, true)
+	logger.Get(ctx).WithField("component", "qan").Debugf("updateInstance request:\n\n%s\n", rb)
+
+	resp, err := svc.qanAPI.Do(req)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	defer resp.Body.Close()
+
+	rb, _ = httputil.DumpResponse(resp, true)
+
+	if resp.StatusCode != http.StatusNoContent {
+		logger.Get(ctx).WithField("component", "qan").Errorf("updateInstance response:\n\n%s\n", rb)
+		return errors.Errorf("unexpected QAN response status code %d", resp.StatusCode)
+	}
+
+	logger.Get(ctx).WithField("component", "qan").Debugf("updateInstance response:\n\n%s\n", rb)
+
+	return nil
+}
+
 // removeInstanceFromServer removes instance from QAN API.
 func (svc *Service) removeInstanceFromServer(ctx context.Context, qanURL *url.URL, uuid string, tail ...string) error {
 	url := *qanURL
@@ -591,6 +666,7 @@ func (svc *Service) sendQANCommand(ctx context.Context, qanURL *url.URL, agentUU
 func (svc *Service) AddQAN(
 	ctx context.Context,
 	nodeName string,
+	subsystem string,
 	dsn string,
 	engineVersion string,
 	qanAgent *models.QanAgent,
@@ -612,7 +688,7 @@ func (svc *Service) AddQAN(
 	}
 
 	instance := &proto.Instance{
-		Subsystem:  "postgresql",
+		Subsystem:  subsystem,
 		ParentUUID: osUUID,
 		Name:       nodeName,
 		DSN:        sanitizeDSN(dsn),
