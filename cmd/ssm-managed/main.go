@@ -391,6 +391,7 @@ type grpcServerDependencies struct {
 	remote       *remote.Service
 	logs         *logs.Logs
 	node         *node.Service
+	metric       *metric.Service
 }
 
 // runGRPCServer runs gRPC server until context is canceled, then gracefully stops it.
@@ -434,6 +435,9 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 		Node:    deps.node,
 		Remote:  deps.remote,
 		Grafana: grafana,
+	})
+	api.RegisterMetricServer(gRPCServer, &handlers.MetricServer{
+		Metric: deps.metric,
 	})
 
 	grpc_prometheus.Register(gRPCServer)
@@ -485,6 +489,7 @@ func runRESTServer(ctx context.Context, logs *logs.Logs) {
 		api.RegisterLogsHandlerFromEndpoint,
 		api.RegisterAnnotationsHandlerFromEndpoint,
 		api.RegisterNodeHandlerFromEndpoint,
+		api.RegisterMetricHandlerFromEndpoint,
 	} {
 		if err := r(ctx, proxyMux, *gRPCAddrF, opts); err != nil {
 			l.Panic(err)
@@ -578,13 +583,6 @@ func runDebugServer(ctx context.Context) {
 		l.Errorf("Failed to shutdown gracefully: %s", err)
 	}
 	cancel()
-}
-
-func runMetricService(ctx context.Context, consulClient *consul.Client, prometheusSvc *prometheus.Service, prometheusAPI prometheusapi.Client) {
-	l := logrus.WithField("component", "metric")
-
-	svc := metric.NewService(consulClient, prometheusSvc, prometheusAPI, l)
-	svc.Run(ctx)
 }
 
 func runWatchService(
@@ -741,6 +739,7 @@ func main() {
 	logs := logs.New(utils.Version, consulClient, db, rds, nil)
 
 	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, deps.db, mysqlService, postgres, rds, snmp)
+	metricService := metric.NewService(consulClient, prometheus, prometheusAPI, logrus.WithField("component", "metric"))
 
 	var wg sync.WaitGroup
 
@@ -757,6 +756,7 @@ func main() {
 			consulClient:        consulClient,
 			logs:                logs,
 			node:                nodeService,
+			metric:              metricService,
 		})
 	}()
 
@@ -775,7 +775,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runMetricService(ctx, consulClient, prometheus, prometheusAPI)
+		metricService.Run(ctx)
 	}()
 
 	wg.Add(1)
