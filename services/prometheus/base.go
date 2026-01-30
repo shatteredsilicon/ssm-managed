@@ -49,9 +49,9 @@ var checkFailedRE = regexp.MustCompile(`FAILED: parsing YAML file \S+: (.+)\n`)
 
 // Service is responsible for interactions with Prometheus.
 // It assumes the following:
-//   * Prometheus API is accessible;
-//   * Prometheus configuration and rule files are accessible;
-//   * promtool is available.
+//   - Prometheus API is accessible;
+//   - Prometheus configuration and rule files are accessible;
+//   - promtool is available.
 type Service struct {
 	ConfigPath   string
 	baseURL      *url.URL

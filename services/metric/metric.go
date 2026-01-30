@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/api"
+	prometheusapi "github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	sAPI "github.com/shatteredsilicon/ssm-managed/api"
@@ -32,11 +32,11 @@ type Service struct {
 	consul        *consul.Client
 	logger        *logrus.Entry
 	prometheusSvc *prometheus.Service
-	prometheusAPI api.Client
+	prometheusAPI prometheusapi.Client
 }
 
 // NewService returns a new metric service
-func NewService(consulClient *consul.Client, prometheusSvc *prometheus.Service, prometheusAPI api.Client, logger *logrus.Entry) *Service {
+func NewService(consulClient *consul.Client, prometheusSvc *prometheus.Service, prometheusAPI prometheusapi.Client, logger *logrus.Entry) *Service {
 	return &Service{
 		consul:        consulClient,
 		prometheusSvc: prometheusSvc,
@@ -224,4 +224,48 @@ FOR_EACH_NODE:
 			}
 		}
 	}
+}
+
+func (svc *Service) GetRulesSamples(ctx context.Context, labels map[string]string) ([]*model.Sample, error) {
+	v1api := v1.NewAPI(svc.prometheusAPI)
+	rules, err := v1api.Rules(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var metricNames []string
+	for _, group := range rules.Groups {
+		if group.Name != "ssm" {
+			continue
+		}
+
+		for _, rule := range group.Rules {
+			switch v := rule.(type) {
+			case v1.RecordingRule:
+				metricNames = append(metricNames, v.Name)
+			default:
+				continue
+			}
+		}
+	}
+
+	if len(metricNames) == 0 {
+		return nil, nil
+	}
+
+	queryLabels := []string{fmt.Sprintf(`__name__=~"%s"`, strings.Join(metricNames, "|"))}
+	for k, v := range labels {
+		queryLabels = append(queryLabels, fmt.Sprintf(`%s=~"%s"`, k, v))
+	}
+
+	res, _, err := v1api.Query(ctx, fmt.Sprintf("{%s}", strings.Join(queryLabels, ",")), time.Now())
+	if err != nil {
+		return nil, err
+	}
+
+	if v, ok := res.(model.Vector); ok {
+		return []*model.Sample(v), nil
+	}
+
+	return nil, nil
 }
