@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"context"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/shatteredsilicon/ssm-managed/api"
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
+	"github.com/shatteredsilicon/ssm-managed/services/mongodb"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	nodeSvc "github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
@@ -25,8 +27,9 @@ type NodeServer struct {
 
 // Remove removes nodes.
 func (s *NodeServer) Remove(ctx context.Context, req *api.NodeRemoveRequest) (*api.NodeRemoveResponse, error) {
-	if err := s.Node.RemoveNode(ctx, req.Name); err != nil {
-		logger.Get(ctx).Errorf("remove node %s failed: %+v", req.Name, err)
+	name, _ := url.PathUnescape(req.Name)
+	if err := s.Node.RemoveNode(ctx, name); err != nil {
+		logger.Get(ctx).Errorf("remove node %s failed: %+v", name, err)
 		return nil, err
 	}
 
@@ -101,11 +104,18 @@ func (s *NodeServer) putRemoteNodes(nodes []remote.FullInstance, respNodes []*ap
 			services[i] = &api.NodeInstanceService{
 				Id:            uint32(db.Service.ID),
 				Type:          string(agent.Type),
-				Address:       *db.Service.Address,
-				Port:          uint32(*db.Service.Port),
 				Region:        db.Node.Region,
 				Engine:        *db.Service.Engine,
 				EngineVersion: *db.Service.EngineVersion,
+			}
+			if db.Service.Port != nil {
+				services[i].Port = uint32(*db.Service.Port)
+			}
+			if db.Service.Type == models.MongoDBServiceType {
+				mongoOpts, _ := mongodb.GetClientOpts(*db.Service.Address)
+				services[i].Address = strings.Join(mongoOpts.Hosts, ",")
+			} else {
+				services[i].Address = *db.Service.Address
 			}
 		}
 
