@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
+	"github.com/shatteredsilicon/ssm-managed/services/mongodb"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
@@ -29,6 +30,7 @@ type Service struct {
 	rds        *rds.Service
 	mysql      *mysql.Service
 	postgresql *postgresql.Service
+	mongodb    *mongodb.Service
 	db         *reform.DB
 	consul     *consul.Client
 	logger     *logrus.Entry
@@ -41,6 +43,7 @@ func NewService(
 	rds *rds.Service,
 	mysql *mysql.Service,
 	postgresql *postgresql.Service,
+	mongo *mongodb.Service,
 	db *reform.DB,
 	consul *consul.Client,
 	logger *logrus.Entry,
@@ -51,6 +54,7 @@ func NewService(
 		db:         db,
 		rds:        rds,
 		mysql:      mysql,
+		mongodb:    mongo,
 		postgresql: postgresql,
 		consul:     consul,
 		logger:     logger,
@@ -135,7 +139,7 @@ func (s *Service) updateEngine(ctx context.Context) {
 			if rdsInstance.Service.EngineVersion != nil {
 				newVersion = *rdsInstance.Service.EngineVersion
 			}
-		} else if remoteInstance.Service.Type == models.MySQLServiceType || remoteInstance.Service.Type == models.PostgreSQLServiceType {
+		} else if utils.SliceContains([]models.ServiceType{models.MySQLServiceType, models.PostgreSQLServiceType, models.MongoDBServiceType}, remoteInstance.Service.Type) {
 			var address, username, password string
 			var port uint32
 			if remoteInstance.Service.Address != nil {
@@ -166,6 +170,18 @@ func (s *Service) updateEngine(ctx context.Context) {
 				newEngine, newVersion, err = s.postgresql.EngineAndEngineVersion(ctx, address, port, username, password)
 				if err != nil {
 					l.Errorf("Got an error when getting engine info for postgresql service: %s\n", err)
+					continue
+				}
+			} else if remoteInstance.Service.Type == models.MongoDBServiceType {
+				mongoOpts, err := mongodb.GetClientOpts(address)
+				if err != nil {
+					l.Errorf("Got an error when setting up mongodb connection: %s\n", err)
+					continue
+				}
+
+				newEngine, newVersion, err = s.mongodb.EngineAndEngineVersion(ctx, mongoOpts)
+				if err != nil {
+					l.Errorf("Got an error when getting engine info for mongodb service: %s\n", err)
 					continue
 				}
 			}

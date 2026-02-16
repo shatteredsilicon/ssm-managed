@@ -32,6 +32,7 @@ const (
 	PostgreSQLServiceType ServiceType = "postgresql"
 	MySQLServiceType      ServiceType = "mysql"
 	SNMPServiceType       ServiceType = "snmp"
+	MongoDBServiceType    ServiceType = "mongodb"
 )
 
 //reform:services
@@ -68,6 +69,18 @@ type RDSServiceDetail struct {
 
 //reform:services
 type PostgreSQLService struct {
+	ID     int32       `reform:"id,pk"`
+	Type   ServiceType `reform:"type"`
+	NodeID int32       `reform:"node_id"`
+
+	Address       *string `reform:"address"`
+	Port          *uint16 `reform:"port"`
+	Engine        *string `reform:"engine"`
+	EngineVersion *string `reform:"engine_version"`
+}
+
+//reform:services
+type MongoDBService struct {
 	ID     int32       `reform:"id,pk"`
 	Type   ServiceType `reform:"type"`
 	NodeID int32       `reform:"node_id"`
