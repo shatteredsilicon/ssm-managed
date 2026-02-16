@@ -261,7 +261,9 @@ func (svc *Service) restoreConfigs(
 	// restore db instance.
 	path = filepath.Join(svc.baseDir, "instance", fmt.Sprintf("%s.json", dbInstance.UUID))
 	if _, err := os.Stat(path); os.IsNotExist(err) || updateDBInstanceCfg {
-		dbInstance.DSN = strings.Replace(dbInstance.DSN, "***", *agent.ServicePassword, 1)
+		if agent.ServicePassword != nil {
+			dbInstance.DSN = strings.Replace(dbInstance.DSN, "***", *agent.ServicePassword, 1)
+		}
 		dbInstance.DSN = fmt.Sprintf("%s/?timeout=5s", dbInstance.DSN)
 		dbInstanceJSON, err := json.MarshalIndent(dbInstance, "", "    ")
 

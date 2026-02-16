@@ -14,6 +14,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
+	"github.com/shatteredsilicon/ssm-managed/services/mongodb"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
@@ -44,6 +45,7 @@ type Service struct {
 	db            *reform.DB
 	mysql         *mysql.Service
 	postgresql    *postgresql.Service
+	mongodb       *mongodb.Service
 	rds           *rds.Service
 	snmp          *snmp.Service
 }
@@ -52,6 +54,7 @@ func NewService(
 	consul *consul.Client, qan *qan.Service, prometheus *prometheus.Service,
 	prometheusAPI prometheusapi.Client, db *reform.DB, mysql *mysql.Service,
 	postgresql *postgresql.Service, rds *rds.Service, snmp *snmp.Service,
+	mongodb *mongodb.Service,
 ) *Service {
 	return &Service{
 		consul:        consul,
@@ -63,6 +66,7 @@ func NewService(
 		postgresql:    postgresql,
 		rds:           rds,
 		snmp:          snmp,
+		mongodb:       mongodb,
 	}
 }
 
@@ -490,6 +494,17 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				}
 			}
 
+		case models.MongoDBExporterAgentType:
+			a := models.MongoDBExporter{ID: agent.ID}
+			if err = tx.Reload(&a); err != nil {
+				return errors.WithStack(err)
+			}
+			if svc.mongodb.MongoDBExporterPath != "" {
+				if err = svc.mongodb.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+					return err
+				}
+			}
+
 		case models.QanAgentAgentType:
 			a := models.QanAgent{ID: agent.ID}
 			if err = tx.Reload(&a); err != nil {
@@ -697,6 +712,17 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 						if err = svc.rds.Supervisor.Start(ctx, svc.rds.RDSExporterServiceConfig(&a)); err != nil {
 							return err
 						}
+					}
+				}
+
+			case models.MongoDBExporterAgentType:
+				a := models.MongoDBExporter{ID: agent.ID}
+				if err = tx.Reload(&a); err != nil {
+					return errors.WithStack(err)
+				}
+				if svc.mongodb.MongoDBExporterPath != "" {
+					if err = svc.mongodb.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
+						return err
 					}
 				}
 

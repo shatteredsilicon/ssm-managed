@@ -99,7 +99,7 @@ rm -f models/*_reform.go
 go generate ./...
 rm -fr api/*.pb.* api/swagger/*.json api/swagger/client api/swagger/models
 protoc -Iapi -Igoogleapis-%{googleapis_branch} api/*.proto --go_out=plugins=grpc:api
-protoc -Iapi -Igoogleapis-%{googleapis_branch} api/*.proto --grpc-gateway_out=logtostderr=true,request_context=true,allow_delete_body=true:api
+protoc -Iapi -Igoogleapis-%{googleapis_branch} api/*.proto --grpc-gateway_out=logtostderr=true,allow_colon_final_segments=true,request_context=true,allow_delete_body=true:api
 
 mkdir -p %{_GOPATH}/src/%{provider}.%{provider_tld}/%{project}
 cp -r $(pwd) %{_GOPATH}/src/%{provider_prefix}

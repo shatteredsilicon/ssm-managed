@@ -152,6 +152,19 @@ type RDSExporter struct {
 	ListenPort *uint16 `reform:"listen_port"`
 }
 
+// MongoDBExporter exports MongoDB metrics.
+//
+//reform:agents
+type MongoDBExporter struct {
+	ID           int32     `reform:"id,pk"`
+	Type         AgentType `reform:"type"`
+	RunsOnNodeID int32     `reform:"runs_on_node_id"`
+
+	ServiceUsername *string `reform:"service_username"`
+	ServicePassword *string `reform:"service_password"`
+	ListenPort      *uint16 `reform:"listen_port"`
+}
+
 //reform:agents
 type QanAgent struct {
 	ID           int32     `reform:"id,pk"`

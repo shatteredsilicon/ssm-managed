@@ -56,6 +56,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 	"github.com/shatteredsilicon/ssm-managed/services/logs"
 	"github.com/shatteredsilicon/ssm-managed/services/metric"
+	"github.com/shatteredsilicon/ssm-managed/services/mongodb"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
@@ -106,6 +107,7 @@ var (
 
 	agentMySQLdExporterF    = flag.String("agent-mysqld-exporter", "/opt/ss/ssm-client/mysqld_exporter", "mysqld_exporter path")
 	agentPostgresExporterF  = flag.String("agent-postgres-exporter", "/opt/ss/ssm-client/postgres_exporter", "postgres_exporter path")
+	agentMongoDBExporterF   = flag.String("agent-mongodb-exporter", "/opt/ss/ssm-client/mongodb_exporter", "mongodb_exporter path")
 	agentRDSExporterF       = flag.String("agent-rds-exporter", "/usr/sbin/rds_exporter", "rds_exporter path")
 	agentRDSExporterConfigF = flag.String("agent-rds-exporter-config", "/etc/ssm-rds-exporter.yml", "rds_exporter configuration file path")
 	agentSNMPExporterF      = flag.String("agent-snmp-exporter", "/opt/ss/snmp_exporter/bin/snmp_exporter", "snmp_exporter path")
@@ -379,12 +381,45 @@ func makePostgreSQLService(ctx context.Context, deps *serviceDependencies, consu
 	return postgresqlService, nil
 }
 
+func makeMongoDBService(ctx context.Context, deps *serviceDependencies, consul *consul.Client) (*mongodb.Service, error) {
+	serviceConfig := mongodb.ServiceConfig{
+		MongoDBExporterPath: *agentMongoDBExporterF,
+
+		Prometheus:    deps.prometheus,
+		Supervisor:    deps.supervisor,
+		DB:            deps.db,
+		QAN:           deps.qan,
+		PortsRegistry: deps.portsRegistry,
+		Consul:        consul,
+	}
+	mongodbService, err := mongodb.NewService(&serviceConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = deps.db.InTransaction(func(tx *reform.TX) error {
+		return mongodbService.ApplyPrometheusConfiguration(ctx, tx.Querier)
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = deps.db.InTransaction(func(tx *reform.TX) error {
+		return mongodbService.Restore(ctx, tx)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return mongodbService, nil
+}
+
 type grpcServerDependencies struct {
 	*serviceDependencies
 	consulClient *consul.Client
 	rds          *rds.Service
 	mysql        *mysql.Service
 	postgres     *postgresql.Service
+	mongodb      *mongodb.Service
 	snmp         *snmp.Service
 	remote       *remote.Service
 	logs         *logs.Logs
@@ -416,6 +451,9 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 	})
 	api.RegisterPostgreSQLServer(gRPCServer, &handlers.PostgreSQLServer{
 		PostgreSQL: deps.postgres,
+	})
+	api.RegisterMongoDBServer(gRPCServer, &handlers.MongoDBServer{
+		MongoDB: deps.mongodb,
 	})
 	api.RegisterSNMPServer(gRPCServer, &handlers.SNMPServer{
 		SNMP: deps.snmp,
@@ -482,6 +520,7 @@ func runRESTServer(ctx context.Context, logs *logs.Logs) {
 		api.RegisterRDSHandlerFromEndpoint,
 		api.RegisterMySQLHandlerFromEndpoint,
 		api.RegisterPostgreSQLHandlerFromEndpoint,
+		api.RegisterMongoDBHandlerFromEndpoint,
 		api.RegisterSNMPHandlerFromEndpoint,
 		api.RegisterRemoteHandlerFromEndpoint,
 		api.RegisterLogsHandlerFromEndpoint,
@@ -590,12 +629,13 @@ func runWatchService(
 	rds *rds.Service,
 	mysql *mysql.Service,
 	postgresql *postgresql.Service,
+	mongo *mongodb.Service,
 	db *reform.DB,
 	consul *consul.Client,
 ) {
 	l := logrus.WithField("component", "watch")
 
-	svc := watch.NewService(node, remote, rds, mysql, postgresql, db, consul, l)
+	svc := watch.NewService(node, remote, rds, mysql, postgresql, mongo, db, consul, l)
 	svc.Run(ctx)
 }
 
@@ -717,6 +757,11 @@ func main() {
 		l.Panicf("PostgreSQL service problem: %+v", err)
 	}
 
+	mongodbService, err := makeMongoDBService(ctx, deps, consulClient)
+	if err != nil {
+		l.Panicf("MongoDB service problem: %+v", err)
+	}
+
 	rds, err := makeRDSService(ctx, deps, postgres)
 	if err != nil {
 		l.Panicf("RDS service problem: %+v", err)
@@ -736,7 +781,7 @@ func main() {
 
 	logs := logs.New(utils.Version, consulClient, db, rds, nil)
 
-	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, prometheusAPI, deps.db, mysqlService, postgres, rds, snmp)
+	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, prometheusAPI, deps.db, mysqlService, postgres, rds, snmp, mongodbService)
 	metricService := metric.NewService(consulClient, prometheus, prometheusAPI, logrus.WithField("component", "metric"))
 
 	var wg sync.WaitGroup
@@ -749,6 +794,7 @@ func main() {
 			rds:                 rds,
 			postgres:            postgres,
 			mysql:               mysqlService,
+			mongodb:             mongodbService,
 			snmp:                snmp,
 			remote:              remoteService,
 			consulClient:        consulClient,
@@ -779,7 +825,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runWatchService(ctx, nodeService, remoteService, rds, mysqlService, postgres, db, consulClient)
+		runWatchService(ctx, nodeService, remoteService, rds, mysqlService, postgres, mongodbService, db, consulClient)
 	}()
 
 	wg.Wait()
