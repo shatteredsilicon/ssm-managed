@@ -738,7 +738,7 @@ func main() {
 
 	logs := logs.New(utils.Version, consulClient, db, rds, nil)
 
-	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, deps.db, mysqlService, postgres, rds, snmp)
+	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, prometheusAPI, deps.db, mysqlService, postgres, rds, snmp)
 	metricService := metric.NewService(consulClient, prometheus, prometheusAPI, logrus.WithField("component", "metric"))
 
 	var wg sync.WaitGroup

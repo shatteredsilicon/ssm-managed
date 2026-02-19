@@ -244,7 +244,7 @@ func (svc *Service) Check(ctx context.Context) error {
 }
 
 // DeleteSeries calls delete_series api
-func (svc *Service) DeleteSeries(queries map[string]string) error {
+func (svc *Service) DeleteSeries(queries []string) error {
 	if len(queries) == 0 {
 		return fmt.Errorf("removing all metrics data is not allowed")
 	}
@@ -253,12 +253,7 @@ func (svc *Service) DeleteSeries(queries map[string]string) error {
 	u.Path = path.Join(u.Path, deleteSeriesURI)
 	q := u.Query()
 
-	queryStrs, i := make([]string, len(queries)), 0
-	for k, v := range queries {
-		queryStrs[i] = fmt.Sprintf("%s\"%s\"", k, v)
-		i++
-	}
-	q.Set("match[]", fmt.Sprintf("{%s}", strings.Join(queryStrs, ",")))
+	q.Set("match[]", fmt.Sprintf("{%s}", strings.Join(queries, ",")))
 	u.RawQuery = q.Encode()
 	resp, err := svc.client.Post(u.String(), "application/json", nil)
 	if err != nil {

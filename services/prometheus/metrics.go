@@ -199,9 +199,7 @@ func (svc *Service) RemoveNode(ctx context.Context, nodeID string) error {
 			}
 		}
 
-		err = svc.DeleteSeries(map[string]string{
-			"instance=": nodeName,
-		})
+		err = svc.DeleteSeries([]string{fmt.Sprintf("instance=\"%s\"", nodeName)})
 		if err != nil {
 			return fmt.Errorf("delete metrics data for %s failed: %s", nodeName, err.Error())
 		}
