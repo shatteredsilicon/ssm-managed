@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	prometheusapi "github.com/prometheus/client_golang/api"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
@@ -23,32 +26,43 @@ import (
 	"gopkg.in/reform.v1"
 )
 
+const (
+	inactiveStateThreshold = 24 * time.Hour
+)
+
+const (
+	inactiveState = iota
+	activeState
+)
+
 // Service client service
 type Service struct {
-	consul     *consul.Client
-	qan        *qan.Service
-	prometheus *prometheus.Service
-	db         *reform.DB
-	mysql      *mysql.Service
-	postgresql *postgresql.Service
-	rds        *rds.Service
-	snmp       *snmp.Service
+	consul        *consul.Client
+	qan           *qan.Service
+	prometheus    *prometheus.Service
+	prometheusAPI prometheusapi.Client
+	db            *reform.DB
+	mysql         *mysql.Service
+	postgresql    *postgresql.Service
+	rds           *rds.Service
+	snmp          *snmp.Service
 }
 
 func NewService(
 	consul *consul.Client, qan *qan.Service, prometheus *prometheus.Service,
-	db *reform.DB, mysql *mysql.Service, postgresql *postgresql.Service,
-	rds *rds.Service, snmp *snmp.Service,
+	prometheusAPI prometheusapi.Client, db *reform.DB, mysql *mysql.Service,
+	postgresql *postgresql.Service, rds *rds.Service, snmp *snmp.Service,
 ) *Service {
 	return &Service{
-		consul:     consul,
-		qan:        qan,
-		prometheus: prometheus,
-		db:         db,
-		mysql:      mysql,
-		postgresql: postgresql,
-		rds:        rds,
-		snmp:       snmp,
+		consul:        consul,
+		qan:           qan,
+		prometheus:    prometheus,
+		prometheusAPI: prometheusAPI,
+		db:            db,
+		mysql:         mysql,
+		postgresql:    postgresql,
+		rds:           rds,
+		snmp:          snmp,
 	}
 }
 
@@ -206,13 +220,11 @@ func (svc *Service) removeServiceFromPrometheus(ctx context.Context, nodeName, s
 			return nil
 		}
 
-		var queries map[string]string
+		var queries []string
 		if nodeTargets == 0 {
 			// no prometheus service under this node
 			// remove all historical data
-			queries = map[string]string{
-				"instance=": nodeName,
-			}
+			queries = []string{fmt.Sprintf("instance=\"%s\"", nodeName)}
 		} else {
 			queries = svc.genPrometheusQueries(nodeName, service)
 		}
@@ -831,9 +843,42 @@ func (svc *Service) GetQanNodes(ctx context.Context, name string, checkData bool
 	return svc.qan.GetUnremovedNodes(ctx, name, checkData)
 }
 
+type PrometheusNodeService struct {
+	prometheus.NodeService
+	State int
+}
+
 // GetPrometheusNodes returns client nodes from prometheus
-func (svc *Service) GetPrometheusNodes(ctx context.Context) ([]prometheus.NodeService, error) {
-	return svc.prometheus.GetNodeServices(ctx)
+func (svc *Service) GetPrometheusNodes(ctx context.Context) ([]PrometheusNodeService, error) {
+	nodeServices, err := svc.prometheus.GetNodeServices(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	services := make([]PrometheusNodeService, len(nodeServices))
+	v1api := v1.NewAPI(svc.prometheusAPI)
+	for i, nsvc := range nodeServices {
+		services[i] = PrometheusNodeService{
+			NodeService: nsvc,
+			State:       inactiveState,
+		}
+
+		queries := svc.genPrometheusQueries(nsvc.Name, string(nsvc.Type))
+		query, _, err := v1api.Query(ctx, fmt.Sprintf("max_over_time(up{%s}[%s])", strings.Join(queries, ","), inactiveStateThreshold.String()), time.Now())
+		if err != nil {
+			return nil, err
+		}
+
+		switch query.Type() {
+		case model.ValVector:
+			vector := query.(model.Vector)
+			if len(vector) > 0 && vector[0].Value.String() == "1" {
+				services[i].State = activeState
+			}
+		}
+	}
+
+	return services, err
 }
 
 // GetRegionFromAgentType returns region of agent type
@@ -854,25 +899,23 @@ func (svc *Service) GetRegionFromAgentType(agentType models.AgentType) string {
 	return ""
 }
 
-func (svc *Service) genPrometheusQueries(nodeName string, service string) map[string]string {
-	queries := map[string]string{
-		"instance=": nodeName,
-	}
+func (svc *Service) genPrometheusQueries(nodeName string, service string) []string {
+	queries := []string{fmt.Sprintf("instance=\"%s\"", nodeName)}
 
 	agentType := models.AgentType(service)
 	switch agentType {
 	case models.MySQLdExporterAgentType, models.ClientMySQLdExporterAgentType:
-		queries["job="] = "mysql"
+		queries = append(queries, "job=\"mysql\"")
 	case models.PostgresExporterAgentType, models.ClientPostgresExporterAgentType:
-		queries["job="] = "postgresql"
+		queries = append(queries, "job=\"postgresql\"")
 	case models.MongoDBExporterAgentType, models.ClientMongoDBExporterAgentType:
-		queries["job="] = "mongodb"
+		queries = append(queries, "job=\"mongodb\"")
 	case models.NodeExporterAgentType, models.ClientNodeExporterAgentType, models.SNMPExporterAgentType:
-		queries["job="] = "linux"
+		queries = append(queries, "job=\"linux\"")
 	case models.ProxySQLExporterAgentType, models.ClientProxySQLExporterAgentType:
-		queries["job="] = "proxysql"
+		queries = append(queries, "job=\"proxysql\"")
 	case models.RDSExporterAgentType:
-		queries["job=~"] = "rds-*"
+		queries = append(queries, "job=~\"rds-*\"")
 	default:
 		return nil
 	}
@@ -972,4 +1015,12 @@ func (svc *Service) GetServiceEngine(instanceServices map[string][]string) (map[
 	}
 
 	return result, nil
+}
+
+func (svc *Service) GetInstanceServiceState(lastActiveTs time.Time) uint32 {
+	if time.Since(lastActiveTs) < inactiveStateThreshold {
+		return activeState
+	}
+
+	return inactiveState
 }

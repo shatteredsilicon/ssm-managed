@@ -10,7 +10,6 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	nodeSvc "github.com/shatteredsilicon/ssm-managed/services/node"
-	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
@@ -176,7 +175,7 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 			continue
 		}
 
-		var nis api.NodeInstanceService
+		nis := api.NodeInstanceService{State: s.Node.GetInstanceServiceState(node.LatestDataStartTs)}
 		if node.OSName == string(models.SSMServerNodeType) {
 			nis.Region = string(models.RemoteNodeRegion)
 			nis.Type = string(models.QanAgentAgentType)
@@ -203,14 +202,17 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 			for _, service := range respNodes[i].Services {
 				if node.SubsystemID == qan.SubsystemMySQL && (service.Type == string(models.QanAgentAgentType) ||
 					service.Type == string(models.ClientMySQLQanAgentAgentType)) {
+					service.State = nis.State
 					serviceExists = true
 					break
 				} else if node.SubsystemID == qan.SubsystemMongo && (service.Type == string(models.QanAgentAgentType) ||
 					service.Type == string(models.ClientMongoDBQanAgentAgentType)) {
+					service.State = nis.State
 					serviceExists = true
 					break
 				} else if node.SubsystemID == qan.SubsystemPostgreSQL && (service.Type == string(models.PostgresQanAgentAgentType) ||
 					service.Type == string(models.ClientPostgresQanAgentAgentType)) {
+					service.State = nis.State
 					serviceExists = true
 					break
 				}
@@ -237,7 +239,7 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 	return respNodes
 }
 
-func (s *NodeServer) putPrometheusNodes(nodes []prometheus.NodeService, respNodes []*api.NodeInstance) []*api.NodeInstance {
+func (s *NodeServer) putPrometheusNodes(nodes []node.PrometheusNodeService, respNodes []*api.NodeInstance) []*api.NodeInstance {
 	for _, node := range nodes {
 		if node.Name == string(models.SSMServerNodeType) { // server itself
 			continue
@@ -248,6 +250,7 @@ func (s *NodeServer) putPrometheusNodes(nodes []prometheus.NodeService, respNode
 			Type:    string(node.Type),
 			Region:  s.Node.GetRegionFromAgentType(node.Type),
 			Address: addressParts[0],
+			State:   uint32(node.State),
 		}
 		if len(addressParts) > 1 {
 			port, _ := strconv.Atoi(addressParts[1])
@@ -264,6 +267,7 @@ func (s *NodeServer) putPrometheusNodes(nodes []prometheus.NodeService, respNode
 			for _, service := range respNodes[i].Services {
 				if service.Type == nis.Type {
 					serviceExists = true
+					service.State = nis.State
 					break
 				}
 			}

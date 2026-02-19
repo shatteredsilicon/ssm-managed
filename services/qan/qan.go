@@ -770,10 +770,11 @@ WHERE ins2.subsystem_id = ? AND ins1.name = ? AND ins1.subsystem_id = ?
 
 // UnremovedNode unremoved node structure
 type UnremovedNode struct {
-	Name         string
-	InstanceUUID string
-	SubsystemID  int
-	OSName       string
+	Name              string
+	InstanceUUID      string
+	SubsystemID       int
+	OSName            string
+	LatestDataStartTs time.Time
 }
 
 // GetUnremovedNodes returns unremoved nodes,
@@ -782,16 +783,17 @@ func (svc *Service) GetUnremovedNodes(ctx context.Context, instanceName string, 
 	var nodes []UnremovedNode
 
 	q1 := `
-SELECT inst.name, inst.uuid, inst.subsystem_id, inst.parent_uuid
+SELECT inst.name, inst.uuid, inst.subsystem_id, inst.parent_uuid, qgm.latest_data_start_ts
 FROM (
-	SELECT DISTINCT instance_id
+	SELECT instance_id, MAX(start_ts) AS latest_data_start_ts
 	FROM query_global_metrics
+	GROUP BY instance_id
 ) qgm
 JOIN instances inst ON qgm.instance_id = inst.instance_id
 WHERE (inst.subsystem_id = ? OR inst.subsystem_id = ? OR inst.subsystem_id = ?)
 `
 	q2 := `
-SELECT name, uuid, subsystem_id, parent_uuid
+SELECT name, uuid, subsystem_id, parent_uuid, NULL AS latest_data_start_ts
 FROM instances
 WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instances.subsystem_id = ? OR instances.subsystem_id = ?)
 `
@@ -811,7 +813,7 @@ WHERE (deleted IS NULL OR deleted = ?) AND (instances.subsystem_id = ? OR instan
 	}
 
 	q := fmt.Sprintf(`
-SELECT inst2.name, inst2.uuid, inst2.subsystem_id, inst1.name AS os_name
+SELECT inst2.name, inst2.uuid, inst2.subsystem_id, inst1.name AS os_name, inst2.latest_data_start_ts
 FROM instances inst1
 JOIN (
 	%s
@@ -829,19 +831,28 @@ JOIN (
 
 	var name, instanceUUID, osName string
 	var subsystemID int
+	var latestDataStartTs sql.NullTime
+	nodeMap := make(map[string]*UnremovedNode)
 	for rows.Next() {
-		err = rows.Scan(&name, &instanceUUID, &subsystemID, &osName)
+		err = rows.Scan(&name, &instanceUUID, &subsystemID, &osName, &latestDataStartTs)
 		if err != nil {
 			return nil, err
 		}
-		nodes = append(nodes, UnremovedNode{
-			Name:         name,
-			InstanceUUID: instanceUUID,
-			SubsystemID:  subsystemID,
-			OSName:       osName,
-		})
+		if n, ok := nodeMap[instanceUUID]; !ok {
+			nodeMap[instanceUUID] = &UnremovedNode{
+				Name:         name,
+				InstanceUUID: instanceUUID,
+				SubsystemID:  subsystemID,
+				OSName:       osName,
+			}
+		} else if latestDataStartTs.Valid && latestDataStartTs.Time.After(n.LatestDataStartTs) {
+			n.LatestDataStartTs = latestDataStartTs.Time
+		}
 	}
 
+	for _, node := range nodeMap {
+		nodes = append(nodes, *node)
+	}
 	return nodes, nil
 }
 

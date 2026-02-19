@@ -24,6 +24,7 @@ message NodeInstanceService {
     uint32 port = 5;
     string engine = 6;
     string engine_version = 7;
+    uint32 state = 8;
 }
 
 message NodeInstance {
