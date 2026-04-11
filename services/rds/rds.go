@@ -28,12 +28,12 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/smithy-go"
 	"github.com/go-sql-driver/mysql"
 	servicelib "github.com/percona/kardianos-service"
 	"github.com/pkg/errors"
@@ -58,6 +58,8 @@ import (
 const (
 	// maximum time for AWS discover APIs calls
 	awsDiscoverTimeout = 7 * time.Second
+
+	defaultRegion = "us-east-1"
 )
 
 var (
@@ -335,86 +337,79 @@ func (svc *Service) Discover(ctx context.Context, accessKey, secretKey string) (
 	var g errgroup.Group
 	instances := make(chan Instance)
 
-	partitions := []endpoints.Partition{endpoints.AwsPartition()}
-	if svc.RDSEnableGovCloud {
-		partitions = append(partitions, endpoints.AwsUsGovPartition())
+	accountOpts := [](func(*awsConfig.LoadOptions) error){awsConfig.WithRegion(defaultRegion)}
+	regionOpts := [](func(*awsConfig.LoadOptions) error){
+		awsConfig.WithHTTPClient(svc.httpClient),
+		awsConfig.WithLogger(awsLogger{loggerFunc: l.Debug}),
+	}
+	if accessKey != "" || secretKey != "" {
+		accountOpts = append(accountOpts, awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")))
+		regionOpts = append(regionOpts, awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")))
 	}
 
-	// add AWS CN region
-	if svc.RDSEnableCnCloud {
-		partitions = append(partitions, endpoints.AwsCnPartition())
+	cfg, err := awsConfig.LoadDefaultConfig(ctx, accountOpts...)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, p := range partitions {
-		for _, r := range p.Services()[endpoints.RdsServiceID].Regions() {
-			region := r.ID()
-			g.Go(func() error {
-				// use given credentials, or default credential chain
-				var creds *credentials.Credentials
-				if accessKey != "" || secretKey != "" {
-					creds = credentials.NewCredentials(&credentials.StaticProvider{
-						Value: credentials.Value{
-							AccessKeyID:     accessKey,
-							SecretAccessKey: secretKey,
-						},
-					})
-				}
-				config := &aws.Config{
-					CredentialsChainVerboseErrors: aws.Bool(true),
-					Credentials:                   creds,
-					Region:                        aws.String(region),
-					HTTPClient:                    svc.httpClient,
-					Logger:                        aws.LoggerFunc(l.Debug),
-				}
-				if l.Logger.GetLevel() >= logrus.DebugLevel {
-					config.LogLevel = aws.LogLevel(aws.LogDebug)
-				}
-				s, err := session.NewSession(config)
-				if err != nil {
-					return errors.WithStack(err)
-				}
+	regions, err := ec2.NewFromConfig(cfg).DescribeRegions(ctx, &ec2.DescribeRegionsInput{
+		AllRegions: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, err
+	}
 
-				out, err := rds.New(s).DescribeDBInstancesWithContext(ctx, new(rds.DescribeDBInstancesInput))
-				if err != nil {
-					l.WithField("region", region).Error(err)
+	for _, r := range regions.Regions {
+		region := *r.RegionName
+		g.Go(func() error {
+			cfg, err := awsConfig.LoadDefaultConfig(ctx,
+				append(
+					[](func(*awsConfig.LoadOptions) error){awsConfig.WithRegion(region)},
+					regionOpts...,
+				)...,
+			)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
-					if err, ok := err.(awserr.Error); ok {
-						if err.OrigErr() != nil && err.OrigErr() == ctx.Err() {
-							// ignore timeout, let other goroutines return partial data
-							return nil
-						}
-						switch err.Code() {
-						case "InvalidClientTokenId", "EmptyStaticCreds":
-							return status.Error(codes.InvalidArgument, err.Message())
-						default:
-							return err
-						}
-					}
-					return errors.WithStack(err)
-				}
+			out, err := rds.NewFromConfig(cfg).DescribeDBInstances(ctx, new(rds.DescribeDBInstancesInput))
+			if err != nil {
+				l.WithField("region", region).Error(err)
 
-				l.Debugf("Got %d instances from %s.", len(out.DBInstances), region)
-				for _, db := range out.DBInstances {
-					instances <- Instance{
-						Node: models.RDSNode{
-							Type: models.RDSNodeType,
-							Name: *db.DBInstanceIdentifier,
-
-							Region: region,
-						},
-						Service: models.RDSService{
-							Type: models.RDSServiceType,
-
-							Address:       db.Endpoint.Address,
-							Port:          pointer.ToUint16(uint16(*db.Endpoint.Port)),
-							Engine:        db.Engine,
-							EngineVersion: db.EngineVersion,
-						},
+				var ae smithy.APIError
+				if errors.As(err, &ae) {
+					switch ae.ErrorCode() {
+					case "InvalidClientTokenId", "EmptyStaticCreds":
+						return status.Error(codes.InvalidArgument, ae.ErrorMessage())
+					default:
+						return err
 					}
 				}
-				return nil
-			})
-		}
+
+				return errors.WithStack(err)
+			}
+
+			l.Debugf("Got %d instances from %s.", len(out.DBInstances), region)
+			for _, db := range out.DBInstances {
+				instances <- Instance{
+					Node: models.RDSNode{
+						Type: models.RDSNodeType,
+						Name: *db.DBInstanceIdentifier,
+
+						Region: region,
+					},
+					Service: models.RDSService{
+						Type: models.RDSServiceType,
+
+						Address:       db.Endpoint.Address,
+						Port:          pointer.ToUint16(uint16(*db.Endpoint.Port)),
+						Engine:        db.Engine,
+						EngineVersion: db.EngineVersion,
+					},
+				}
+			}
+			return nil
+		})
 	}
 
 	go func() {
