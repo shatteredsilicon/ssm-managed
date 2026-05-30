@@ -90,6 +90,7 @@ type MySQLdExporter struct {
 
 func (m *MySQLdExporter) DSN(service *MySQLService) string {
 	cfg := mysql.NewConfig()
+	cfg.TLSConfig = "preferred"
 	cfg.User = *m.ServiceUsername
 	cfg.Passwd = *m.ServicePassword
 
@@ -106,7 +107,6 @@ func (m *MySQLdExporter) DSN(service *MySQLService) string {
 
 	cfg.Timeout = sqlDialTimeout
 
-	// TODO TLSConfig: "true", https://jira.percona.com/browse/PMM-1727
 	// TODO Other parameters?
 	return cfg.FormatDSN()
 }
@@ -207,6 +207,7 @@ type FullAgent struct {
 
 func (q *QanAgent) MySQLDSN(service *MySQLService) string {
 	cfg := mysql.NewConfig()
+	cfg.TLSConfig = "preferred"
 	cfg.User = *q.ServiceUsername
 	cfg.Passwd = *q.ServicePassword
 
@@ -222,7 +223,6 @@ func (q *QanAgent) MySQLDSN(service *MySQLService) string {
 
 	cfg.Timeout = sqlDialTimeout
 
-	// TODO TLSConfig: "true", https://jira.percona.com/browse/PMM-1727
 	// TODO Other parameters?
 	return cfg.FormatDSN()
 }
