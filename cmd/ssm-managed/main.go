@@ -415,15 +415,16 @@ func makeMongoDBService(ctx context.Context, deps *serviceDependencies, consul *
 
 type grpcServerDependencies struct {
 	*serviceDependencies
-	consulClient *consul.Client
-	rds          *rds.Service
-	mysql        *mysql.Service
-	postgres     *postgresql.Service
-	mongodb      *mongodb.Service
-	snmp         *snmp.Service
-	remote       *remote.Service
-	logs         *logs.Logs
-	node         *node.Service
+	consulClient  *consul.Client
+	rds           *rds.Service
+	mysql         *mysql.Service
+	postgres      *postgresql.Service
+	mongodb       *mongodb.Service
+	snmp          *snmp.Service
+	remote        *remote.Service
+	logs          *logs.Logs
+	node          *node.Service
+	prometheusAPI prometheusapi.Client
 }
 
 // runGRPCServer runs gRPC server until context is canceled, then gracefully stops it.
@@ -431,7 +432,7 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 	l := logrus.WithField("component", "gRPC")
 	l.Infof("Starting server on http://%s/ ...", *gRPCAddrF)
 
-	grafana := grafana.NewClient(*grafanaAddrF, *grafanaDBF, *grafanaAlertsPathF)
+	grafana := grafana.NewClient(*grafanaAddrF, *grafanaDBF, *grafanaAlertsPathF, deps.prometheusAPI)
 
 	gRPCServer := grpc.NewServer(
 		grpc.UnaryInterceptor(interceptors.Unary),
@@ -801,6 +802,7 @@ func main() {
 			consulClient:        consulClient,
 			logs:                logs,
 			node:                nodeService,
+			prometheusAPI:       prometheusAPI,
 		})
 	}()
 
