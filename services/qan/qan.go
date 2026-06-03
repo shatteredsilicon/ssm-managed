@@ -264,7 +264,7 @@ func (svc *Service) restoreConfigs(
 		if agent.ServicePassword != nil {
 			dbInstance.DSN = strings.Replace(dbInstance.DSN, "***", *agent.ServicePassword, 1)
 		}
-		dbInstance.DSN = fmt.Sprintf("%s/?timeout=5s", dbInstance.DSN)
+		dbInstance.DSN = fmt.Sprintf("%s/?timeout=5s&tls=preferred", dbInstance.DSN)
 		dbInstanceJSON, err := json.MarshalIndent(dbInstance, "", "    ")
 
 		if err != nil {
