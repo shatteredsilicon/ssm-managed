@@ -1,6 +1,6 @@
 module github.com/shatteredsilicon/ssm-managed
 
-go 1.25.10
+go 1.25.11
 
 require (
 	github.com/AlekSi/pointer v1.2.0
