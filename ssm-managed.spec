@@ -42,55 +42,14 @@ See the SSM docs for more information.
 
 %build
 export GOPATH=%{_GOPATH}
-mkdir -p %{_GOPATH}/src
-mkdir -p %{_GOPATH}/bin
 export PATH=%{getenv:PATH}:%{_GOPATH}/bin
-export GO111MODULE=off
 
-mkdir -p vendor/github.com/cespare/xxhash/v2
-find vendor/github.com/cespare/xxhash  ! -path '*/v2' -mindepth 1 -maxdepth 1 -exec mv {} vendor/github.com/cespare/xxhash/v2 \;
-
-mkdir -p %{_GOPATH}/src/gopkg.in
-cp -r vendor/gopkg.in/reform.v1 %{_GOPATH}/src/gopkg.in/
-cp -r vendor %{_GOPATH}/src/gopkg.in/reform.v1/
-pushd %{_GOPATH}/src/gopkg.in/reform.v1/
-    rm -rf vendor/gopkg.in/reform.v1
-    go install ./reform
-popd
-
-mkdir -p %{_GOPATH}/src/github.com/vektra
-cp -r vendor/github.com/vektra/mockery %{_GOPATH}/src/github.com/vektra/
-cp -r vendor %{_GOPATH}/src/github.com/vektra/mockery/v2/
-pushd %{_GOPATH}/src/github.com/vektra/mockery/v2/
-    rm -rf vendor/github.com/vektra/mockery
-    go build -o mockery .
-    mv mockery %{_GOPATH}/bin/
-popd
-
-mkdir -p %{_GOPATH}/src/github.com/golang
-cp -r vendor/github.com/golang/protobuf %{_GOPATH}/src/github.com/golang/
-cp -r vendor %{_GOPATH}/src/github.com/golang/protobuf/
-pushd %{_GOPATH}/src/github.com/golang/protobuf/
-    rm -rf vendor/github.com/golang/protobuf
-    go install ./protoc-gen-go
-popd
-
-mkdir -p %{_GOPATH}/src/github.com/go-swagger
-cp -r vendor/github.com/go-swagger/go-swagger %{_GOPATH}/src/github.com/go-swagger
-cp -r vendor %{_GOPATH}/src/github.com/go-swagger/go-swagger/
-pushd %{_GOPATH}/src/github.com/go-swagger/go-swagger/
-    rm -rf vendor/github.com/go-swagger/go-swagger
-    go install ./cmd/swagger
-popd
-
-mkdir -p %{_GOPATH}/src/github.com/grpc-ecosystem
-cp -r vendor/github.com/grpc-ecosystem/grpc-gateway %{_GOPATH}/src/github.com/grpc-ecosystem
-cp -r vendor %{_GOPATH}/src/github.com/grpc-ecosystem/grpc-gateway/
-pushd %{_GOPATH}/src/github.com/grpc-ecosystem/grpc-gateway/
-    rm -rf vendor/github.com/grpc-ecosystem/grpc-gateway
-    go install ./protoc-gen-grpc-gateway
-    go install ./protoc-gen-swagger
-popd
+GOTOOLCHAIN=local go install ./vendor/gopkg.in/reform.v1/reform
+GOTOOLCHAIN=local go install ./vendor/github.com/vektra/mockery/v2
+GOTOOLCHAIN=local go install ./vendor/github.com/golang/protobuf/protoc-gen-go
+GOTOOLCHAIN=local go install ./vendor/github.com/go-swagger/go-swagger/cmd/swagger
+GOTOOLCHAIN=local go install ./vendor/github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
+GOTOOLCHAIN=local go install ./vendor/github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger
 
 mkdir -p %{_GOPATH}/src/github.com/percona
 cp -r vendor/github.com/percona/kardianos-service %{_GOPATH}/src/github.com/percona/
@@ -101,9 +60,7 @@ rm -fr api/*.pb.* api/swagger/*.json api/swagger/client api/swagger/models
 protoc -Iapi -Igoogleapis-%{googleapis_branch} api/*.proto --go_out=plugins=grpc:api
 protoc -Iapi -Igoogleapis-%{googleapis_branch} api/*.proto --grpc-gateway_out=logtostderr=true,allow_colon_final_segments=true,request_context=true,allow_delete_body=true:api
 
-mkdir -p %{_GOPATH}/src/%{provider}.%{provider_tld}/%{project}
-cp -r $(pwd) %{_GOPATH}/src/%{provider_prefix}
-go build -ldflags "${LDFLAGS:-} -s -w -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n') -X 'github.com/shatteredsilicon/ssm-managed/utils.Version=%{version}-%{release}'" -a -v -x %{provider_prefix}/cmd/ssm-managed
+GOTOOLCHAIN=local go build -ldflags "${LDFLAGS:-} -s -w -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n') -X 'github.com/shatteredsilicon/ssm-managed/utils.Version=%{version}-%{release}'" -a -v -x ./cmd/ssm-managed
 
 
 %install
