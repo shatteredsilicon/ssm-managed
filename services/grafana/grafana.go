@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,8 +37,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	prometheusapi "github.com/prometheus/client_golang/api"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 )
 
@@ -45,16 +50,43 @@ const (
 	defaultOrgID              = 1
 	defaultAlertRuleNamespace = "Alerts"
 	defaultDatasource         = "Prometheus"
-	defaultIntervalSeconds    = 60
 	defaultNoDataState        = "NoData"
 	defaultExecErrState       = "Alerting"
 )
 
 const (
-	typeAlertRulesDisabled = iota
-	typeAlertRulesEnabled
-	typeAlertRulesPartiallyEnabled
+	AlertRuleStatusDisabled = iota
+	AlertRuleStatusEnabled
+	AlertRuleStatusPartiallyEnabled
 )
+
+const (
+	AlertRuleCategorySystem  = "system"
+	AlertRuleCategoryMySQL   = "mysql"
+	AlertRuleCategoryMongoDB = "mongodb"
+)
+
+var tplFuncMap = template.FuncMap{
+	"mul": func(args ...any) (float64, error) {
+		val := float64(1)
+		for _, arg := range args {
+			switch v := arg.(type) {
+			case int8:
+			case int16:
+			case int32:
+			case int64:
+			case float32:
+			case float64:
+				val *= float64(v)
+			case nil:
+				continue
+			default:
+				return 0, errors.Errorf("unsupported type %T for the mul function", v)
+			}
+		}
+		return val, nil
+	},
+}
 
 // Client represents a client for Grafana API.
 type Client struct {
@@ -62,15 +94,17 @@ type Client struct {
 	db         string
 	alertsPath string
 	http       *http.Client
+	prometheus prometheusapi.Client
 }
 
 // NewClient creates a new client for given Grafana address.
-func NewClient(addr string, db string, alertsPath string) *Client {
+func NewClient(addr string, db string, alertsPath string, prometheus prometheusapi.Client) *Client {
 	return &Client{
 		addr:       addr,
 		db:         db,
 		alertsPath: alertsPath,
 		http:       &http.Client{},
+		prometheus: prometheus,
 	}
 }
 
@@ -187,6 +221,7 @@ type alertRule struct {
 	Labels       map[string]string  `json:"labels"`
 	NoDataState  string             `json:"noDataState"`
 	ExecErrState string             `json:"execErrState"`
+	Category     string             `json:"category"`
 }
 
 func (rule alertRule) checksumUID() string {
@@ -202,18 +237,69 @@ type alertQuery struct {
 		From time.Duration `json:"from"`
 		To   time.Duration `json:"to"`
 	} `json:"relativeTimeRange"`
-	DatasourceUID string          `json:"datasourceUid"`
-	Model         json.RawMessage `json:"model"`
+	DatasourceUID string         `json:"datasourceUid"`
+	Model         alertRuleModel `json:"model"`
+}
+
+type alertRuleModel struct {
+	Expr       string `json:"expr"`
+	Datasource struct {
+		Type string `json:"type"`
+		UID  string `json:"uid"`
+	} `json:"datasource"`
+	Hide          bool                 `json:"hide"`
+	IntervalMs    int                  `json:"intervalMs"`
+	MaxDataPoints int                  `json:"maxDataPoints"`
+	RefID         string               `json:"refId"`
+	LegendFormat  string               `json:"legendFormat"`
+	Type          string               `json:"type"`
+	Conditions    []alertRuleCondition `json:"conditions"`
+}
+
+type alertRuleCondition struct {
+	Evaluator struct {
+		Params []any  `json:"params"`
+		Type   string `json:"type"`
+	} `json:"evaluator"`
+	Operator struct {
+		Type string `json:"type"`
+	} `json:"operator"`
+	Query struct {
+		Params []string `json:"params"`
+	} `json:"query"`
+	Reducer struct {
+		Type   string   `json:"type"`
+		Params []string `json:"params"`
+	} `json:"reducer"`
+	Type string `json:"type"`
+}
+
+func (c alertRuleCondition) MarshalJSON() ([]byte, error) {
+	type condition alertRuleCondition
+
+	for i := range c.Evaluator.Params {
+		switch v := c.Evaluator.Params[i].(type) {
+		case string:
+			c.Evaluator.Params[i], _ = strconv.ParseFloat(v, 64)
+		case int, int8, int16, int32, int64, float32, float64:
+			continue
+		default:
+			return nil, errors.Errorf("unsupported param type %T for the condition evaluator", v)
+		}
+	}
+
+	return json.Marshal(condition(c))
 }
 
 type alertRuleParam struct {
 	DatasourceUID string
 	NamespaceUID  string
 	Instance      string
+	InitialValue  float64
 }
 
-func (c *Client) HealthAlertsStateMap(ctx context.Context, instances ...string) (map[string]int32, error) {
-	stateMap := make(map[string]int32)
+func (c *Client) HealthAlertsStateMap(ctx context.Context, instances ...string) (map[string]map[string]int32, error) {
+	stateMap := make(map[string]map[string]int32)
 
 	db, err := sql.Open("sqlite3", c.db)
 	if err != nil {
@@ -226,12 +312,12 @@ func (c *Client) HealthAlertsStateMap(ctx context.Context, instances ...string) 
 	}
 
 	if len(alertFiles) == 0 || len(instances) == 0 {
-		return map[string]int32{}, nil
+		return map[string]map[string]int32{}, nil
 	}
 
 	for _, instance := range instances {
 		for _, alertFile := range alertFiles {
-			tpl, err := template.ParseFiles(alertFile)
+			tpl, err := template.New(path.Base(alertFile)).Funcs(tplFuncMap).ParseFiles(alertFile)
 			if err != nil {
 				return nil, err
 			}
@@ -257,22 +343,26 @@ func (c *Client) HealthAlertsStateMap(ctx context.Context, instances ...string) 
 				return nil, err
 			}
 
-			if err == sql.ErrNoRows || id == 0 {
-				if state, ok := stateMap[instance]; !ok {
-					stateMap[instance] = typeAlertRulesDisabled
-				} else if state == typeAlertRulesEnabled {
-					stateMap[instance] = typeAlertRulesPartiallyEnabled
-					break
-				}
-				continue
+			state, stateExists := stateMap[instance]
+			if !stateExists {
+				state = make(map[string]int32)
 			}
 
-			if state, ok := stateMap[instance]; !ok {
-				stateMap[instance] = typeAlertRulesEnabled
-			} else if state == typeAlertRulesDisabled {
-				stateMap[instance] = typeAlertRulesPartiallyEnabled
-				break
+			if err == sql.ErrNoRows || id == 0 {
+				if state[rule.Category] == AlertRuleStatusEnabled {
+					state[rule.Category] = AlertRuleStatusPartiallyEnabled
+				} else if _, ok := state[rule.Category]; !ok {
+					state[rule.Category] = AlertRuleStatusDisabled
+				}
+			} else {
+				if _, ok := state[rule.Category]; !ok {
+					state[rule.Category] = AlertRuleStatusEnabled
+				} else if state[rule.Category] == AlertRuleStatusDisabled {
+					state[rule.Category] = AlertRuleStatusPartiallyEnabled
+				}
 			}
+
+			stateMap[instance] = state
 		}
 	}
 
@@ -308,7 +398,7 @@ func (c *Client) alertFiles() ([]string, error) {
 	return alertFiles, nil
 }
 
-func (c *Client) EnableHealthAlerts(ctx context.Context, instance string) error {
+func (c *Client) EnableHealthAlerts(ctx context.Context, instance string, categories ...string) error {
 	alertFiles, err := c.alertFiles()
 	if err != nil {
 		return err
@@ -337,15 +427,62 @@ func (c *Client) EnableHealthAlerts(ctx context.Context, instance string) error 
 
 	defer func() {
 		if err != nil {
-			go c.DisableHealthAlerts(context.TODO(), instance)
+			go c.DisableHealthAlerts(context.TODO(), instance, categories...)
 		}
 	}()
 
 	for _, alertFile := range alertFiles {
 		var tpl *template.Template
-		tpl, err = template.ParseFiles(alertFile)
+		tpl, err = template.New(path.Base(alertFile)).Funcs(tplFuncMap).ParseFiles(alertFile)
 		if err != nil {
 			return err
+		}
+
+		if rawRuleString := tpl.Root.String(); strings.Contains(rawRuleString, ".InitialValue") {
+			var tmpRule alertRule
+			if err = json.Unmarshal([]byte(rawRuleString), &tmpRule); err != nil {
+				return err
+			}
+
+			if len(categories) > 0 && !utils.SliceContains(categories, tmpRule.Category) {
+				continue
+			}
+
+			for _, d := range tmpRule.Data {
+				if d.Model.Datasource.Type != "prometheus" || d.Model.Expr == "" {
+					continue
+				}
+
+				exprTpl, err := template.New("").Funcs(tplFuncMap).Parse(d.Model.Expr)
+				if err != nil {
+					return err
+				}
+
+				var queryBytes bytes.Buffer
+				if err = exprTpl.Execute(&queryBytes, param); err != nil {
+					return err
+				}
+
+				initialVal, _, err := v1.NewAPI(c.prometheus).Query(ctx, queryBytes.String(), time.Now())
+				if err != nil {
+					return err
+				}
+
+				switch initialVal.Type() {
+				case model.ValScalar:
+					param.InitialValue = float64(initialVal.(*model.Scalar).Value)
+				case model.ValMatrix:
+					matrix := initialVal.(model.Matrix)
+					if len(matrix) > 0 && len(matrix[0].Values) > 0 {
+						param.InitialValue = float64(matrix[0].Values[0].Value)
+					}
+				case model.ValVector:
+					vector := initialVal.(model.Vector)
+					if len(vector) > 0 {
+						param.InitialValue = float64(vector[0].Value)
+					}
+				}
+			}
 		}
 
 		var alertRuleBytes bytes.Buffer
@@ -359,6 +496,10 @@ func (c *Client) EnableHealthAlerts(ctx context.Context, instance string) error 
 		}
 
 		if rule.UID == "" {
+			continue
+		}
+
+		if len(categories) > 0 && !utils.SliceContains(categories, rule.Category) {
 			continue
 		}
 
@@ -407,7 +548,7 @@ func (c *Client) EnableHealthAlerts(ctx context.Context, instance string) error 
 	return nil
 }
 
-func (c *Client) DisableHealthAlerts(ctx context.Context, instance string) error {
+func (c *Client) DisableHealthAlerts(ctx context.Context, instance string, categories ...string) error {
 	alertFiles, err := c.alertFiles()
 	if err != nil {
 		return err
@@ -418,7 +559,7 @@ func (c *Client) DisableHealthAlerts(ctx context.Context, instance string) error
 	}
 
 	for _, alertFile := range alertFiles {
-		tpl, err := template.ParseFiles(alertFile)
+		tpl, err := template.New(path.Base(alertFile)).Funcs(tplFuncMap).ParseFiles(alertFile)
 		if err != nil {
 			return err
 		}
@@ -435,6 +576,10 @@ func (c *Client) DisableHealthAlerts(ctx context.Context, instance string) error
 			return err
 		}
 		if rule.UID == "" {
+			continue
+		}
+
+		if len(categories) > 0 && !utils.SliceContains(categories, rule.Category) {
 			continue
 		}
 
@@ -497,7 +642,7 @@ func (c *Client) postAlertRule(ctx context.Context, body []byte) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+	if (resp.StatusCode < 200 || resp.StatusCode > 299) && resp.StatusCode != http.StatusConflict {
 		return errors.Errorf("got an unexpected status code from grafana's post alert rule api: %d", resp.StatusCode)
 	}
 

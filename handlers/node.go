@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"maps"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -90,7 +92,7 @@ func (s *NodeServer) List(ctx context.Context, req *api.NodeListRequest) (*api.N
 		logger.Get(ctx).Errorf("get health alerts enabled map failed: %+v", err)
 	} else {
 		for i := range resp.Instances {
-			resp.Instances[i].HealthAlertsState = healthAlertsStateMap[resp.Instances[i].Name]
+			resp.Instances[i].HealthAlertsStatus = healthAlertsStateMap[resp.Instances[i].Name]
 		}
 	}
 
@@ -300,12 +302,35 @@ func (s *NodeServer) UpdateHealthAlerts(ctx context.Context, req *api.HealthAler
 		return &resp, nil
 	}
 
+	stateMap, err := s.Grafana.HealthAlertsStateMap(ctx, req.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	if req.Enabled.Value {
-		if err := s.Grafana.EnableHealthAlerts(ctx, req.Name); err != nil {
+		var categories []string
+		if req.Category != "" {
+			categories = []string{req.Category}
+			if req.Category != grafana.AlertRuleCategorySystem && stateMap[req.Name] != nil && stateMap[req.Name][grafana.AlertRuleCategorySystem] == grafana.AlertRuleStatusDisabled {
+				categories = []string{grafana.AlertRuleCategorySystem, req.Category}
+			}
+		}
+
+		if err := s.Grafana.EnableHealthAlerts(ctx, req.Name, categories...); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := s.Grafana.DisableHealthAlerts(ctx, req.Name); err != nil {
+		var categories []string
+		if req.Category != "" {
+			categories = []string{req.Category}
+			if req.Category != grafana.AlertRuleCategorySystem && slices.IndexFunc(slices.Collect(maps.Keys(stateMap[req.Name])), func(c string) bool {
+				return c != req.Category && c != grafana.AlertRuleCategorySystem && stateMap[req.Name][c] != grafana.AlertRuleStatusDisabled
+			}) == -1 {
+				categories = []string{grafana.AlertRuleCategorySystem, req.Category}
+			}
+		}
+
+		if err := s.Grafana.DisableHealthAlerts(ctx, req.Name, categories...); err != nil {
 			return nil, err
 		}
 	}

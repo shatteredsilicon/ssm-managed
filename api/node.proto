@@ -30,7 +30,8 @@ message NodeInstance {
     string name = 1;
     repeated NodeInstanceService services = 2;
     reserved 3; // health_alerts_enabled
-    int32 health_alerts_state = 4; // 0 = disabled, 1 = enabled, 2 = partially enabled
+    reserved 4; // health_alerts_state, 0 = disabled, 1 = enabled, 2 = partially enabled
+    map<string, int32> health_alerts_status = 5;
 }
 
 message NodeListResponse {
@@ -49,6 +50,7 @@ message NodeRemoveServiceResponse {
 message HealthAlertsUpdateRequest {
     string name = 1;
     google.protobuf.BoolValue enabled = 2;
+    string category = 3;
 }
 
 message HealthAlertsUpdateResponse {
