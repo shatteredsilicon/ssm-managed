@@ -19,14 +19,12 @@ package main
 import (
 	"bytes"
 	"database/sql"
-	_ "expvar"
 	"flag"
 	"fmt"
 	"html/template"
 	"log"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strings"
@@ -570,13 +568,17 @@ func runRESTServer(ctx context.Context, logs *logs.Logs) {
 func runDebugServer(ctx context.Context) {
 	l := logrus.WithField("component", "debug")
 
-	http.Handle("/debug/metrics", promhttp.Handler())
+	// Use a dedicated ServeMux to avoid exposing endpoints registered on
+	// http.DefaultServeMux by transitive dependencies (e.g. expvar via
+	// go-grpc-prometheus → client_golang → expvar).
+	debugMux := http.NewServeMux()
+	debugMux.Handle("/debug/metrics", promhttp.Handler())
 
-	handlers := []string{"/debug/metrics", "/debug/vars", "/debug/requests", "/debug/events", "/debug/pprof"}
+	handlers := []string{"/debug/metrics"}
 	if *swaggerF == "debug" {
 		handlers = append(handlers, "/swagger")
 		l.Printf("Swagger enabled. http://%s/swagger/", *debugAddrF)
-		addSwaggerHandler(http.DefaultServeMux)
+		addSwaggerHandler(debugMux)
 	}
 
 	for i, h := range handlers {
@@ -598,13 +600,14 @@ func runDebugServer(ctx context.Context) {
 	if err != nil {
 		l.Panic(err)
 	}
-	http.HandleFunc("/debug", func(rw http.ResponseWriter, req *http.Request) {
+	debugMux.HandleFunc("/debug", func(rw http.ResponseWriter, req *http.Request) {
 		rw.Write(buf.Bytes())
 	})
-	l.Infof("Starting server on http://%s/debug\nRegistered handlers:\n\t%s", *debugAddrF, strings.Join(handlers, "\n\t"))
+	l.Infof("Starting server on http://%s/debug\nRegistered handlers:\n	%s", *debugAddrF, strings.Join(handlers, "\n	"))
 
 	server := &http.Server{
 		Addr:     *debugAddrF,
+		Handler:  debugMux,
 		ErrorLog: log.New(os.Stderr, "runDebugServer: ", 0),
 	}
 	go func() {
