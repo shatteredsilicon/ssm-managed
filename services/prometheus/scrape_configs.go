@@ -186,7 +186,7 @@ func (svc *Service) getTargetsHealth(ctx context.Context, instances ...string) (
 	return health, nil
 }
 
-// checkReachability checks that given targets can be reached from PMM Server.
+// checkReachability checks that given targets can be reached from SSM Server.
 // reachabilityCh is closed when this method returns.
 func (svc *Service) checkReachability(ctx context.Context, cfg *ScrapeConfig, targets []string, reachabilityCh chan<- ScrapeTargetReachability) {
 	// use ephemeral transport with small timeouts and disabled HTTP keep-alive

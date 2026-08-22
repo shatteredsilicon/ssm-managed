@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Client is a client for pmm-managed APIs.
+// Client is a client for ssm-managed APIs.
 type Client struct {
 	BaseClient
 	ScrapeConfigsClient

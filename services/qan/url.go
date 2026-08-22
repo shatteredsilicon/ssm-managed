@@ -30,7 +30,7 @@ import (
 
 /*
 We almost could connect to 127.0.0.1:9001 and do not use nginx and HTTP Basic auth.
-Unfortunately, QAN API always assumes /qan-api/ in URLs in responses, even if pmm-managed goes directly to it.
+Unfortunately, QAN API always assumes /qan-api/ in URLs in responses, even if ssm-managed goes directly to it.
 See https://github.com/percona/qan-api/blob/v1.4.1/app/init.go#L156-L166
 In the end, qan-agent receives something like ws://127.0.0.1:9001/qan-api which doesn't work.
 

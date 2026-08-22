@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-// Package qan contains business logic of working with QAN and qan-agent on PMM Server node.
+// Package qan contains business logic of working with QAN and qan-agent on SSM Server node.
 package qan
 
 import (
@@ -97,7 +97,7 @@ func (svc *Service) qanAgentConfigPath() string {
 	return filepath.Join(svc.baseDir, "config", "agent.conf")
 }
 
-// ensureAgentIsRegistered registers a single qan-agent instance on PMM Server node in QAN.
+// ensureAgentIsRegistered registers a single qan-agent instance on SSM Server node in QAN.
 // It does not re-register or change configuration if agent is already registered.
 // QAN API URL is always returned when no error is encountered.
 func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, error) {
@@ -317,7 +317,7 @@ func (svc *Service) restoreConfigs(
 
 	path = filepath.Join(svc.baseDir, "config", "agent.conf")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		serverUser := "pmm"
+		serverUser := "ssm"
 		if os.Getenv("SERVER_USER") != "" {
 			serverUser = os.Getenv("SERVER_USER")
 		}
@@ -338,7 +338,6 @@ func (svc *Service) restoreConfigs(
 			"managed",
 		}
 
-		// agentConf := fmt.Sprintf(`{"UUID":"%s","ApiHostname":"127.0.0.1","ApiPath":"/qan-api/","ServerUser":"pmm"}`, agentInstance.UUID)
 		b, err := json.Marshal(agentConf)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to Marshal agent.conf")
