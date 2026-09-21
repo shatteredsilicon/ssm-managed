@@ -520,7 +520,7 @@ func (svc *Service) addQanAgent(
 	username, password string,
 	qanConfig *config.QAN,
 ) error {
-	// Despite running a single qan-agent process on PMM Server, we use one database record per MySQL instance
+	// Despite running a single qan-agent process on SSM Server, we use one database record per MySQL instance
 	// to store username/password and UUID.
 
 	// insert qan-agent agent and association

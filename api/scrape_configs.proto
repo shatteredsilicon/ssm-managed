@@ -115,7 +115,7 @@ message ScrapeConfigsGetResponse {
 message ScrapeConfigsCreateRequest {
     ScrapeConfig scrape_config = 1;
 
-    // Check that added targets can be scraped from PMM Server
+    // Check that added targets can be scraped from SSM Server
     bool check_reachability = 2;
 }
 
@@ -125,7 +125,7 @@ message ScrapeConfigsCreateResponse {
 message ScrapeConfigsUpdateRequest {
     ScrapeConfig scrape_config = 1;
 
-    // Check that added targets can be scraped from PMM Server
+    // Check that added targets can be scraped from SSM Server
     bool check_reachability = 2;
 }
 

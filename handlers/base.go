@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-// Package handlers implements gRPC API of pmm-managed.
+// Package handlers implements gRPC API of ssm-managed.
 package handlers
 
 import (
@@ -24,12 +24,12 @@ import (
 )
 
 type BaseServer struct {
-	PMMVersion string
+	SSMVersion string
 }
 
 func (s *BaseServer) Version(context.Context, *api.BaseVersionRequest) (*api.BaseVersionResponse, error) {
 	return &api.BaseVersionResponse{
-		Version: s.PMMVersion,
+		Version: s.SSMVersion,
 	}, nil
 }
 
