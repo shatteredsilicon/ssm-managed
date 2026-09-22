@@ -436,7 +436,7 @@ func runGRPCServer(ctx context.Context, deps *grpcServerDependencies) {
 		grpc.UnaryInterceptor(interceptors.Unary),
 		grpc.StreamInterceptor(interceptors.Stream),
 	)
-	api.RegisterBaseServer(gRPCServer, &handlers.BaseServer{PMMVersion: utils.Version})
+	api.RegisterBaseServer(gRPCServer, &handlers.BaseServer{SSMVersion: utils.Version})
 	api.RegisterDemoServer(gRPCServer, &handlers.DemoServer{})
 	api.RegisterScrapeConfigsServer(gRPCServer, &handlers.ScrapeConfigsServer{
 		Prometheus: deps.prometheus,
