@@ -68,22 +68,17 @@ type ServiceConfig struct {
 	QAN           *qan.Service
 	PortsRegistry *ports.Registry
 	Consul        *consul.Client
+
+	SSMServerNodeID int32
 }
 
 // Service is responsible for interactions with PostgreSQL.
 type Service struct {
 	*ServiceConfig
-	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
-	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, path := range []*string{
 		&config.PostgresExporterPath,
 	} {
@@ -99,7 +94,6 @@ func NewService(config *ServiceConfig) (*Service, error) {
 
 	svc := &Service{
 		ServiceConfig: config,
-		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -468,7 +462,7 @@ func (svc *Service) AddPostgresExporter(ctx context.Context, tx *reform.TX, serv
 	}
 	agent := &models.PostgresExporter{
 		Type:         models.PostgresExporterAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -526,7 +520,7 @@ func (svc *Service) addQanAgent(
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,

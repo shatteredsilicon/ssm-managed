@@ -975,3 +975,43 @@ func (svc *Service) getQANConfig(ctx context.Context, qanURL *url.URL, uuid stri
 
 	return &config, nil
 }
+
+func (svc *Service) AddToolReport(ctx context.Context, instanceName string, ts time.Time, toolType string, payload []byte) error {
+	var instanceID int
+	if err := svc.db.QueryRowContext(ctx, "SELECT instance_id FROM instances WHERE name = ?", instanceName).Scan(&instanceID); err != nil {
+		return err
+	}
+
+	_, err := svc.db.Exec("INSERT INTO tool_reports (instance_id, ts, `type`, payload) VALUES (?, ?, ?, ?)", instanceID, ts, toolType, payload)
+	return err
+}
+
+type ToolReport struct {
+	InstanceName string
+	Ts           time.Time
+	Type         string
+	Payload      string
+}
+
+func (svc *Service) GetLatestToolReport(ctx context.Context, instanceName, toolType string) (*ToolReport, error) {
+	var toolReport ToolReport
+	if err := svc.db.QueryRowContext(
+		ctx,
+		`SELECT
+			i.name,
+			tr.ts,
+			tr.type,
+			tr.payload
+		FROM tool_reports tr
+		JOIN instances i ON tr.instance_id = i.instance_id
+		WHERE i.name = ? AND tr.type = ?
+		ORDER BY tr.ts DESC
+		LIMIT 1
+		`,
+		instanceName, toolType,
+	).Scan(&toolReport.InstanceName, &toolReport.Ts, &toolReport.Type, &toolReport.Payload); err != nil {
+		return nil, err
+	}
+
+	return &toolReport, nil
+}

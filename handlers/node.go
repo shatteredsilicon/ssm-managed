@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // NodeServer server for node apis
@@ -315,4 +317,38 @@ func (s *NodeServer) UpdateHealthAlerts(ctx context.Context, req *api.HealthAler
 	}
 
 	return &resp, nil
+}
+
+func (s *NodeServer) AddToolReport(ctx context.Context, req *api.AddToolReportRequest) (*api.AddToolReportResponse, error) {
+	var resp api.AddToolReportResponse
+
+	if err := s.Node.AddToolReport(ctx, req.NodeName, req.Ts.AsTime(), req.Type, req.Payload); err != nil {
+		logger.Get(ctx).Errorf("failed to add tool report: %+v", err)
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func (s *NodeServer) GetToolReport(ctx context.Context, req *api.GetToolReportRequest) (*api.GetToolReportResponse, error) {
+	if req.Type == "" {
+		return nil, fmt.Errorf("type must be specified")
+	}
+
+	toolReport, err := s.Node.GetToolReport(ctx, req.NodeName, req.Type)
+	if err != nil {
+		logger.Get(ctx).Errorf("failed to get tool report: %+v", err)
+		return nil, err
+	}
+
+	if toolReport == nil {
+		return nil, nil
+	}
+
+	return &api.GetToolReportResponse{
+		InstanceName: toolReport.InstanceName,
+		Ts:           timestamppb.New(toolReport.Ts),
+		Type:         toolReport.Type,
+		Payload:      toolReport.Payload,
+	}, nil
 }

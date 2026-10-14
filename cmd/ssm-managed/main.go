@@ -50,6 +50,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/api"
 	"github.com/shatteredsilicon/ssm-managed/handlers"
 	"github.com/shatteredsilicon/ssm-managed/models"
+	"github.com/shatteredsilicon/ssm-managed/services/agent"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/grafana"
 	"github.com/shatteredsilicon/ssm-managed/services/logs"
@@ -112,6 +113,8 @@ var (
 	snmpGeneratorF          = flag.String("snmp-generator", "/opt/ss/snmp_exporter/bin/generator", "snmp_generator path")
 	agentSNMPConfigDirF     = flag.String("agent-snmp-config-dir", "/opt/ss/snmp_exporter", "snmp_exporter config directory")
 	agentQANBaseF           = flag.String("agent-qan-base", "/opt/ss/qan-agent", "qan-agent installation base path")
+	toolAgentF              = flag.String("tool-agent", "/opt/ss/tool-agent/tool-agent", "tool-agent path")
+	toolAgentBaseF          = flag.String("tool-agent-base", "/opt/ss/tool-agent", "tool-agent installation base path")
 
 	rdsEnableGovCloud = flag.Bool("rds-enable-gov-cloud", false, "Enable GOV cloud for RDS")
 	rdsEnableCnCloud  = flag.Bool("rds-enable-cn-cloud", false, "Enable AWS CN cloud for RDS")
@@ -186,14 +189,8 @@ func makePortsRegistry(db *reform.DB) (*ports.Registry, error) {
 }
 
 func makeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSvc *mysql.Service) error {
-	var node models.Node
-	err := deps.db.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return err
-	}
-
 	var service models.MySQLService
-	if err = deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", node.ID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
+	if err := deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", deps.ssmServerNodeID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
 		return errors.WithStack(err)
 	}
 
@@ -202,7 +199,7 @@ func makeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSv
 		return nil
 	}
 
-	_, err = mysqlSvc.Add(
+	_, err := mysqlSvc.Add(
 		ctx,
 		models.SSMServerNodeName,
 		*dbSocketF,
@@ -217,14 +214,8 @@ func makeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSv
 }
 
 func removeInternalService(ctx context.Context, deps *serviceDependencies, mysqlSvc *mysql.Service) error {
-	var node models.Node
-	err := deps.db.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return err
-	}
-
 	var service models.MySQLService
-	if err = deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", node.ID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
+	if err := deps.db.SelectOneTo(&service, "WHERE node_id = ? AND type = ?", deps.ssmServerNodeID, models.MySQLServiceType); err != nil && err != sql.ErrNoRows {
 		return errors.WithStack(err)
 	}
 
@@ -233,7 +224,7 @@ func removeInternalService(ctx context.Context, deps *serviceDependencies, mysql
 		return nil
 	}
 
-	return mysqlSvc.Remove(ctx, node.ID)
+	return mysqlSvc.Remove(ctx, deps.ssmServerNodeID)
 }
 
 type serviceDependencies struct {
@@ -242,6 +233,9 @@ type serviceDependencies struct {
 	db            *reform.DB
 	portsRegistry *ports.Registry
 	qan           *qan.Service
+	toolAgent     *agent.ToolAgent
+
+	ssmServerNodeID int32
 }
 
 func makeRDSService(ctx context.Context, deps *serviceDependencies, postgres *postgresql.Service) (*rds.Service, error) {
@@ -257,9 +251,12 @@ func makeRDSService(ctx context.Context, deps *serviceDependencies, postgres *po
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
 		QAN:           deps.qan,
+		ToolAgent:     deps.toolAgent,
 
 		RDSEnableGovCloud: *rdsEnableGovCloud,
 		RDSEnableCnCloud:  *rdsEnableCnCloud,
+
+		SSMServerNodeID: deps.ssmServerNodeID,
 	}
 	rdsService, err := rds.NewService(&rdsConfig)
 	if err != nil {
@@ -293,6 +290,8 @@ func makeSNMPService(ctx context.Context, deps *serviceDependencies, consul *con
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
 		Consul:        consul,
+
+		SSMServerNodeID: deps.ssmServerNodeID,
 	}
 	snmpService, err := snmp.NewService(&snmpConfig)
 	if err != nil {
@@ -325,6 +324,9 @@ func makeMySQLService(ctx context.Context, deps *serviceDependencies, consul *co
 		PortsRegistry: deps.portsRegistry,
 		QAN:           deps.qan,
 		Consul:        consul,
+		ToolAgent:     deps.toolAgent,
+
+		SSMServerNodeID: deps.ssmServerNodeID,
 	}
 	mysqlService, err := mysql.NewService(&serviceConfig)
 	if err != nil {
@@ -357,6 +359,8 @@ func makePostgreSQLService(ctx context.Context, deps *serviceDependencies, consu
 		QAN:           deps.qan,
 		PortsRegistry: deps.portsRegistry,
 		Consul:        consul,
+
+		SSMServerNodeID: deps.ssmServerNodeID,
 	}
 	postgresqlService, err := postgresql.NewService(&serviceConfig)
 	if err != nil {
@@ -389,6 +393,9 @@ func makeMongoDBService(ctx context.Context, deps *serviceDependencies, consul *
 		QAN:           deps.qan,
 		PortsRegistry: deps.portsRegistry,
 		Consul:        consul,
+		ToolAgent:     deps.toolAgent,
+
+		SSMServerNodeID: deps.ssmServerNodeID,
 	}
 	mongodbService, err := mongodb.NewService(&serviceConfig)
 	if err != nil {
@@ -725,6 +732,11 @@ func main() {
 	defer sqlDB.Close()
 	db := reform.NewDB(sqlDB, reformMySQL.Dialect, nil)
 
+	var nodeModel models.Node
+	if err := db.FindOneTo(&nodeModel, "type", models.SSMServerNodeType); err != nil {
+		l.Panic(err)
+	}
+
 	portsRegistry, err := makePortsRegistry(db)
 	if err != nil {
 		l.Panic(err)
@@ -736,7 +748,10 @@ func main() {
 		qan:           qan,
 		db:            db,
 		portsRegistry: portsRegistry,
+
+		ssmServerNodeID: nodeModel.ID,
 	}
+	deps.toolAgent = agent.NewToolAgent(deps.ssmServerNodeID, *toolAgentF, *toolAgentBaseF, deps.supervisor)
 
 	mysqlService, err := makeMySQLService(ctx, deps, consulClient)
 	if err != nil {
@@ -784,7 +799,7 @@ func main() {
 
 	logs := logs.New(utils.Version, consulClient, db, rds, nil)
 
-	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, prometheusAPI, deps.db, mysqlService, postgres, rds, snmp, mongodbService)
+	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, prometheusAPI, deps.db, mysqlService, postgres, rds, snmp, mongodbService, deps.toolAgent, deps.supervisor)
 	metricService := metric.NewService(consulClient, prometheus, prometheusAPI, logrus.WithField("component", "metric"))
 
 	var wg sync.WaitGroup

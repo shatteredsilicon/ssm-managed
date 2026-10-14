@@ -58,13 +58,14 @@ type ServiceConfig struct {
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
 	Consul        *consul.Client
+
+	SSMServerNodeID int32
 }
 
 // Service is responsible for interactions with SNMP.
 type Service struct {
 	*ServiceConfig
-	httpClient    *http.Client
-	ssmServerNode *models.Node
+	httpClient *http.Client
 }
 
 func (svc *Service) generatorConfigPath(name string) string {
@@ -81,12 +82,6 @@ func (svc *Service) exporterConfigPath(name string) string {
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
-	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, path := range []*string{
 		&config.SNMPExporterPath,
 	} {
@@ -103,7 +98,6 @@ func NewService(config *ServiceConfig) (*Service, error) {
 	svc := &Service{
 		ServiceConfig: config,
 		httpClient:    new(http.Client),
-		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -229,7 +223,7 @@ func (svc *Service) addSNMPExporter(ctx context.Context, tx *reform.TX, service 
 	// insert snmp_exporter agent and association
 	agent := &models.SNMPExporter{
 		Type:            models.SNMPExporterAgentType,
-		RunsOnNodeID:    svc.ssmServerNode.ID,
+		RunsOnNodeID:    svc.SSMServerNodeID,
 		ListenPort:      &port,
 		ServiceUsername: &username,
 		ServicePassword: &password,

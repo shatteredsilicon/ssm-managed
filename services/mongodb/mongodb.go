@@ -20,6 +20,7 @@ import (
 
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/services/agent"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
@@ -43,22 +44,18 @@ type ServiceConfig struct {
 	QAN           *qan.Service
 	PortsRegistry *ports.Registry
 	Consul        *consul.Client
+	ToolAgent     *agent.ToolAgent
+
+	SSMServerNodeID int32
 }
 
 // Service is responsible for interactions with MongoDB.
 type Service struct {
 	*ServiceConfig
-	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
-	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, path := range []*string{
 		&config.MongoDBExporterPath,
 	} {
@@ -74,7 +71,6 @@ func NewService(config *ServiceConfig) (*Service, error) {
 
 	svc := &Service{
 		ServiceConfig: config,
-		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -229,6 +225,9 @@ func (svc *Service) Add(
 		if err = svc.addQanAgent(ctx, tx, service, node, uri, qanConfig); err != nil {
 			return err
 		}
+		if err = svc.addToolAgent(ctx, tx, name, service, clientOpts); err != nil {
+			return err
+		}
 
 		return svc.ApplyPrometheusConfiguration(ctx, tx.Querier)
 	})
@@ -295,7 +294,7 @@ func (svc *Service) AddMongoDBExporter(ctx context.Context, tx *reform.TX, servi
 	}
 	agent := &models.MongoDBExporter{
 		Type:         models.MongoDBExporterAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ListenPort: &port,
 	}
@@ -342,7 +341,7 @@ func (svc *Service) addQanAgent(
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ListenPort: pointer.ToUint16(models.QanAgentPort),
 	}
@@ -452,6 +451,23 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						return err
 					}
 				}
+
+			case models.ToolAgentAgentType:
+				if svc.ToolAgent != nil {
+					a := models.FullAgent{ID: agent.ID}
+					if err = tx.Reload(&a); err != nil {
+						return errors.WithStack(err)
+					}
+
+					clientOpts, err := GetClientOpts(*service.Address)
+					if err != nil {
+						return errors.WithStack(err)
+					}
+
+					if err := svc.addToolAgent(ctx, nil, node.Name, service, clientOpts); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -476,6 +492,31 @@ func (svc *Service) MongoDBExporterCfg(agent *models.MongoDBExporter, uri string
 		Arguments:   arguments,
 		Environment: []string{fmt.Sprintf("MONGODB_URI=%s", uri)},
 	}
+}
+
+func (svc *Service) addToolAgent(
+	ctx context.Context,
+	tx *reform.TX,
+	instance string,
+	service *models.MongoDBService,
+	opts *options.ClientOptions,
+) error {
+	return svc.ToolAgent.Add(
+		ctx,
+		tx,
+		&models.Service{
+			ID:     service.ID,
+			Type:   service.Type,
+			NodeID: service.NodeID,
+		},
+		instance,
+		[]agent.ToolAgentConfItem{
+			{
+				Name:       "pt-mongodb-summary",
+				Executable: fmt.Sprintf("pt-mongodb-summary --username=%s --password=%s --authenticationDatabase=%s", opts.Auth.Username, opts.Auth.Password, opts.Auth.AuthSource),
+			},
+		},
+	)
 }
 
 func GetClientOpts(uri string) (*options.ClientOptions, error) {

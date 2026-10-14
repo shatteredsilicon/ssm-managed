@@ -5,6 +5,7 @@ package api;
 option go_package = ".;api";
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
 
 message NodeRemoveRequest {
     string name = 1;
@@ -55,6 +56,27 @@ message HealthAlertsUpdateRequest {
 message HealthAlertsUpdateResponse {
 }
 
+message AddToolReportRequest {
+    string                      node_name = 1;
+    google.protobuf.Timestamp   ts = 2;
+    string                      type = 3;
+    bytes                       payload = 4;
+}
+
+message AddToolReportResponse {}
+
+message GetToolReportRequest {
+    string node_name = 1;
+    string type = 2;
+}
+
+message GetToolReportResponse {
+    string                      instance_name = 1;
+    google.protobuf.Timestamp   ts = 2;
+    string                      type = 3;
+    string                      payload = 4;
+}
+
 service Node {
     rpc Remove(NodeRemoveRequest) returns (NodeRemoveResponse) {
         option (google.api.http) = {
@@ -79,6 +101,19 @@ service Node {
         option (google.api.http) = {
             put: "/v0/nodes/{name}/health-alerts"
             body: "*"
+        };
+    }
+
+    rpc AddToolReport(AddToolReportRequest) returns (AddToolReportResponse) {
+        option (google.api.http) = {
+            post: "/v0/nodes/{node_name}/tool-reports"
+            body: "*"
+        };
+    }
+
+    rpc GetToolReport(GetToolReportRequest) returns (GetToolReportResponse) {
+        option (google.api.http) = {
+            get: "/v0/nodes/{node_name}/tool-report"
         };
     }
 }

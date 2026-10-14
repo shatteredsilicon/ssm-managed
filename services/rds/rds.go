@@ -46,6 +46,7 @@ import (
 
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/services/agent"
 	pgService "github.com/shatteredsilicon/ssm-managed/services/postgresql"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
 	"github.com/shatteredsilicon/ssm-managed/services/qan"
@@ -79,26 +80,22 @@ type ServiceConfig struct {
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
 	QAN           *qan.Service
+	ToolAgent     *agent.ToolAgent
 
 	RDSEnableGovCloud bool
 	RDSEnableCnCloud  bool
+
+	SSMServerNodeID int32
 }
 
 // Service is responsible for interactions with AWS RDS.
 type Service struct {
 	*ServiceConfig
-	httpClient    *http.Client
-	ssmServerNode *models.Node
+	httpClient *http.Client
 }
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
-	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, path := range []*string{
 		&config.MySQLdExporterPath,
 		&config.RDSExporterPath,
@@ -116,7 +113,6 @@ func NewService(config *ServiceConfig) (*Service, error) {
 	svc := &Service{
 		ServiceConfig: config,
 		httpClient:    new(http.Client),
-		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -514,7 +510,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 	}
 	agent := &models.MySQLdExporter{
 		Type:         models.MySQLdExporterAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -529,7 +525,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 
 	// check connection and a number of tables
 	var tableCount int
-	dsn := agent.DSN(svc.MySQLServiceFromRDSService(service))
+	dsn := models.MySQLDSN(*service.Address, *service.Port, *agent.ServiceUsername, *agent.ServicePassword)
 	db, err := sql.Open("mysql", dsn)
 	if err == nil {
 		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
@@ -667,7 +663,7 @@ func (svc *Service) addRDSExporter(ctx context.Context, tx *reform.TX, service *
 	// insert rds_exporter agent and associations
 	agent := &models.RDSExporter{
 		Type:         models.RDSExporterAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ListenPort: pointer.ToUint16(models.RDSExporterPort),
 	}
@@ -708,7 +704,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -737,7 +733,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 		}
 	} else {
 		s := svc.MySQLServiceFromRDSService(service)
-		if err = svc.QAN.AddQAN(ctx, node.Name, "mysql", agent.MySQLDSN(s), *service.EngineVersion, agent, defaultMySQLQANConfig); err != nil {
+		if err = svc.QAN.AddQAN(ctx, node.Name, "mysql", models.MySQLDSN(*s.Address, *s.Port, *agent.ServiceUsername, *agent.ServicePassword), *service.EngineVersion, agent, defaultMySQLQANConfig); err != nil {
 			return err
 		}
 	}
@@ -748,6 +744,51 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	}
 
 	return nil
+}
+
+func (svc *Service) addToolAgent(
+	ctx context.Context,
+	tx *reform.TX,
+	instance string,
+	service *models.RDSService,
+	username, password string,
+	ssl bool,
+) error {
+	mysqlArgs := fmt.Sprintf("--user %s --password %s --host %s --port %d", username, password, *service.Address, *service.Port)
+
+	pmsCmd := fmt.Sprintf("pt-mysql-summary %s", mysqlArgs)
+	pdkcCmd := fmt.Sprintf("pt-duplicate-key-checker %s", mysqlArgs)
+	sukcCmd := fmt.Sprintf("st-unused-key-checker %s", mysqlArgs)
+	if ssl {
+		pmsCmd += " -- --ssl"
+		pdkcCmd += " s=true"
+		sukcCmd += " s=true"
+	}
+
+	return svc.ToolAgent.Add(
+		ctx,
+		tx,
+		&models.Service{
+			ID:     service.ID,
+			Type:   service.Type,
+			NodeID: service.NodeID,
+		},
+		instance,
+		[]agent.ToolAgentConfItem{
+			{
+				Name:       "pt-mysql-summary",
+				Executable: pmsCmd,
+			},
+			{
+				Name:       "pt-duplicate-key-checker",
+				Executable: pdkcCmd,
+			},
+			{
+				Name:       "st-unused-key-checker",
+				Executable: sukcCmd,
+			},
+		},
+	)
 }
 
 func (svc *Service) MySQLServiceFromRDSService(service *models.RDSService) *models.MySQLService {
@@ -859,6 +900,15 @@ func (svc *Service) Add(ctx context.Context, accessKey, secretKey string, id *In
 		}
 		if err = svc.addQanAgent(ctx, tx, service, node, username, password); err != nil {
 			return err
+		}
+		if !service.IsPg() {
+			ssl, err := svc.isSSLUsed(ctx, service, username, password)
+			if err != nil {
+				return err
+			}
+			if err = svc.addToolAgent(ctx, tx, node.Name, service, username, password, ssl); err != nil {
+				return err
+			}
 		}
 
 		return svc.ApplyPrometheusConfiguration(ctx, tx.Querier)
@@ -994,6 +1044,16 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 						return err
 					}
 				}
+
+			case models.ToolAgentAgentType:
+				a := models.FullAgent{ID: agent.ID}
+				if err = tx.Reload(&a); err != nil {
+					return errors.WithStack(err)
+				}
+
+				if err := svc.ToolAgent.Remove(ctx, node.Name); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -1070,7 +1130,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						}
 					}
 
-					dsn := a.DSN(svc.MySQLServiceFromRDSService(service))
+					dsn := models.MySQLDSN(*service.Address, *service.Port, *a.ServiceUsername, *a.ServicePassword)
 					cfg := svc.mysqlExporterCfg(a, dsn)
 					if err = svc.Supervisor.Start(ctx, cfg); err != nil {
 						return err
@@ -1165,9 +1225,51 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						return err
 					}
 				}
+
+			case models.ToolAgentAgentType:
+				if svc.ToolAgent != nil {
+					a := models.FullAgent{ID: agent.ID}
+					if err = tx.Reload(&a); err != nil {
+						return errors.WithStack(err)
+					}
+
+					ssl, err := svc.isSSLUsed(ctx, service, *a.ServiceUsername, *a.ServicePassword)
+					if err != nil {
+						return errors.WithStack(err)
+					}
+
+					serviceName := svc.ToolAgent.ToolAgentServiceName(node.Name)
+					if err := svc.Supervisor.Status(ctx, serviceName); err == nil {
+						if err := svc.Supervisor.Stop(ctx, serviceName); err != nil {
+							return err
+						}
+					}
+
+					if err := svc.addToolAgent(ctx, nil, node.Name, service, *a.ServiceUsername, *a.ServicePassword, ssl); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
 
 	return nil
+}
+
+func (svc *Service) isSSLUsed(ctx context.Context, service *models.RDSService, username, password string) (bool, error) {
+	db, err := sql.Open("mysql", models.MySQLDSN(*service.Address, *service.Port, username, password))
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+	defer db.Close()
+
+	sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
+	defer cancel()
+
+	var sslChip sql.NullString
+	if err = db.QueryRowContext(sqlCtx, "SHOW SESSION STATUS LIKE 'Ssl_cipher'").Scan(&sslChip); err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	return sslChip.String != "", nil
 }
