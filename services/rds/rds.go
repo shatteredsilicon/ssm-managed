@@ -49,7 +49,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/agent"
 	pgService "github.com/shatteredsilicon/ssm-managed/services/postgresql"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
@@ -64,8 +64,8 @@ const (
 )
 
 var (
-	defaultMySQLQANConfig      = config.QAN{CollectFrom: qan.RDSSlowlogCollectFrom}
-	defaultPostgreSQLQANConfig = config.QAN{CollectFrom: qan.RDSLogfileCollectForm}
+	defaultMySQLQANConfig      = config.QAN{CollectFrom: ssm.RDSSlowlogCollectFrom}
+	defaultPostgreSQLQANConfig = config.QAN{CollectFrom: ssm.RDSLogfileCollectForm}
 )
 
 type ServiceConfig struct {
@@ -79,7 +79,7 @@ type ServiceConfig struct {
 	Supervisor    services.Supervisor
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
-	QAN           *qan.Service
+	SSM           *ssm.Service
 	ToolAgent     *agent.ToolAgent
 
 	RDSEnableGovCloud bool
@@ -718,7 +718,7 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 		return errors.WithStack(err)
 	}
 
-	if svc.QAN == nil {
+	if svc.SSM == nil {
 		return nil
 	}
 
@@ -728,12 +728,12 @@ func (svc *Service) addQanAgent(ctx context.Context, tx *reform.TX, service *mod
 	// start or reconfigure qan-agent
 	if service.IsPg() {
 		s := svc.PostgreSQLServiceFromRDSService(service)
-		if err = svc.QAN.AddQAN(ctx, node.Name, "postgresql", agent.PostgreSQLDSN(s), *service.EngineVersion, agent, defaultPostgreSQLQANConfig); err != nil {
+		if err = svc.SSM.AddQAN(ctx, node.Name, "postgresql", agent.PostgreSQLDSN(s), *service.EngineVersion, agent, defaultPostgreSQLQANConfig); err != nil {
 			return err
 		}
 	} else {
 		s := svc.MySQLServiceFromRDSService(service)
-		if err = svc.QAN.AddQAN(ctx, node.Name, "mysql", models.MySQLDSN(*s.Address, *s.Port, *agent.ServiceUsername, *agent.ServicePassword), *service.EngineVersion, agent, defaultMySQLQANConfig); err != nil {
+		if err = svc.SSM.AddQAN(ctx, node.Name, "mysql", models.MySQLDSN(*s.Address, *s.Port, *agent.ServiceUsername, *agent.ServicePassword), *service.EngineVersion, agent, defaultMySQLQANConfig); err != nil {
 			return err
 		}
 	}
@@ -1038,9 +1038,9 @@ func (svc *Service) Remove(ctx context.Context, id *InstanceID) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.QAN != nil {
+				if svc.SSM != nil {
 					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-					if err = svc.QAN.RemoveQAN(ctx, &a, false); err != nil {
+					if err = svc.SSM.RemoveQAN(ctx, &a, false); err != nil {
 						return err
 					}
 				}
@@ -1191,7 +1191,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.QAN != nil {
+				if svc.SSM != nil {
 					name := models.NameForSupervisor(a.Type, *a.ListenPort)
 
 					err := svc.Supervisor.Status(ctx, name)
@@ -1213,8 +1213,8 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 					}
 
 					// Installs new version of the script.
-					if err = svc.QAN.Restore(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: qanAgentSubsystem}, defaultQANConfig); err != nil {
-						if _, ok := err.(qan.QANCommandError); ok {
+					if err = svc.SSM.RestoreQAN(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: qanAgentSubsystem}, defaultQANConfig); err != nil {
+						if _, ok := err.(ssm.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),
 							// one should check what happens on the qan-agent side, ssm-managed

@@ -42,7 +42,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/agent"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
 	"github.com/shatteredsilicon/ssm/proto/config"
@@ -54,11 +54,11 @@ const (
 
 var (
 	DefaultSSMServerQANConfig = config.QAN{
-		CollectFrom: qan.SlowlogCollectFrom,
+		CollectFrom: ssm.SlowlogCollectFrom,
 		FilterAllow: []string{"SELECT", "DELETE"},
 	}
 	defaultRemoteQANConfig = config.QAN{
-		CollectFrom: qan.PerfschemaCollectFrom,
+		CollectFrom: ssm.PerfschemaCollectFrom,
 	}
 )
 
@@ -71,7 +71,7 @@ type ServiceConfig struct {
 	Supervisor    services.Supervisor
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
-	QAN           *qan.Service
+	SSM           *ssm.Service
 	Consul        *consul.Client
 	ToolAgent     *agent.ToolAgent
 
@@ -396,7 +396,7 @@ func (svc *Service) addQanAgent(
 	// so we do not check connection again
 
 	// start or reconfigure qan-agent
-	if svc.QAN != nil {
+	if svc.SSM != nil {
 		if qanConfig == nil {
 			qanConfig = &defaultRemoteQANConfig
 		}
@@ -405,7 +405,7 @@ func (svc *Service) addQanAgent(
 		if node.Type == models.SSMServerNodeType {
 			nodeName = string(node.Type) // ssm-server node uses type as name
 		}
-		if err = svc.QAN.AddQAN(ctx, nodeName, "mysql", models.MySQLDSN(*service.Address, *service.Port, *agent.ServiceUsername, *agent.ServicePassword), *service.EngineVersion, agent, *qanConfig); err != nil {
+		if err = svc.SSM.AddQAN(ctx, nodeName, "mysql", models.MySQLDSN(*service.Address, *service.Port, *agent.ServiceUsername, *agent.ServicePassword), *service.EngineVersion, agent, *qanConfig); err != nil {
 			return err
 		}
 
@@ -657,11 +657,11 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.QAN != nil {
+				if svc.SSM != nil {
 					if node.Type == models.SSMServerNodeType {
-						err = svc.QAN.RemoveQAN(ctx, &a, true)
+						err = svc.SSM.RemoveQAN(ctx, &a, true)
 					} else {
-						err = svc.QAN.RemoveQAN(ctx, &a, false)
+						err = svc.SSM.RemoveQAN(ctx, &a, false)
 					}
 					if err != nil {
 						return err
@@ -757,7 +757,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.QAN != nil {
+				if svc.SSM != nil {
 					name := models.NameForSupervisor(a.Type, *a.ListenPort)
 					err := svc.Supervisor.Status(ctx, name)
 					if err == nil {
@@ -771,8 +771,8 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						qanConfig = DefaultSSMServerQANConfig
 					}
 
-					if err = svc.QAN.Restore(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "mysql"}, qanConfig); err != nil {
-						if _, ok := err.(qan.QANCommandError); ok {
+					if err = svc.SSM.RestoreQAN(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "mysql"}, qanConfig); err != nil {
+						if _, ok := err.(ssm.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),
 							// one should check what happens on the qan-agent side, ssm-managed

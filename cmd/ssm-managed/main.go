@@ -60,10 +60,10 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/rds"
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
 	"github.com/shatteredsilicon/ssm-managed/services/snmp"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/services/supervisor"
 	"github.com/shatteredsilicon/ssm-managed/services/watch"
 	"github.com/shatteredsilicon/ssm-managed/utils"
@@ -232,7 +232,7 @@ type serviceDependencies struct {
 	supervisor    *supervisor.Supervisor
 	db            *reform.DB
 	portsRegistry *ports.Registry
-	qan           *qan.Service
+	ssm           *ssm.Service
 	toolAgent     *agent.ToolAgent
 
 	ssmServerNodeID int32
@@ -250,7 +250,7 @@ func makeRDSService(ctx context.Context, deps *serviceDependencies, postgres *po
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
-		QAN:           deps.qan,
+		SSM:           deps.ssm,
 		ToolAgent:     deps.toolAgent,
 
 		RDSEnableGovCloud: *rdsEnableGovCloud,
@@ -322,7 +322,7 @@ func makeMySQLService(ctx context.Context, deps *serviceDependencies, consul *co
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
 		PortsRegistry: deps.portsRegistry,
-		QAN:           deps.qan,
+		SSM:           deps.ssm,
 		Consul:        consul,
 		ToolAgent:     deps.toolAgent,
 
@@ -356,7 +356,7 @@ func makePostgreSQLService(ctx context.Context, deps *serviceDependencies, consu
 		Prometheus:    deps.prometheus,
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
-		QAN:           deps.qan,
+		SSM:           deps.ssm,
 		PortsRegistry: deps.portsRegistry,
 		Consul:        consul,
 
@@ -390,7 +390,7 @@ func makeMongoDBService(ctx context.Context, deps *serviceDependencies, consul *
 		Prometheus:    deps.prometheus,
 		Supervisor:    deps.supervisor,
 		DB:            deps.db,
-		QAN:           deps.qan,
+		SSM:           deps.ssm,
 		PortsRegistry: deps.portsRegistry,
 		Consul:        consul,
 		ToolAgent:     deps.toolAgent,
@@ -720,7 +720,7 @@ func main() {
 		l.Panic(err)
 	}
 
-	qan, err := qan.NewService(ctx, *agentQANBaseF, supervisor, qanDB)
+	ssm, err := ssm.NewService(ctx, *agentQANBaseF, supervisor, qanDB)
 	if err != nil {
 		l.Panicf("QAN service problem: %+v", err)
 	}
@@ -745,7 +745,7 @@ func main() {
 	deps := &serviceDependencies{
 		prometheus:    prometheus,
 		supervisor:    supervisor,
-		qan:           qan,
+		ssm:           ssm,
 		db:            db,
 		portsRegistry: portsRegistry,
 
@@ -799,7 +799,7 @@ func main() {
 
 	logs := logs.New(utils.Version, consulClient, db, rds, nil)
 
-	nodeService := node.NewService(consulClient, deps.qan, deps.prometheus, prometheusAPI, deps.db, mysqlService, postgres, rds, snmp, mongodbService, deps.toolAgent, deps.supervisor)
+	nodeService := node.NewService(consulClient, deps.ssm, deps.prometheus, prometheusAPI, deps.db, mysqlService, postgres, rds, snmp, mongodbService, deps.toolAgent, deps.supervisor)
 	metricService := metric.NewService(consulClient, prometheus, prometheusAPI, logrus.WithField("component", "metric"))
 
 	var wg sync.WaitGroup

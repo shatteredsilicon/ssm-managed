@@ -1,5 +1,5 @@
-// pmm-managed
-// Copyright (C) 2017 Percona LLC
+// ssm-managed
+// Copyright (C) 2026 Shattered Silicon
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-// Package qan contains business logic of working with QAN and qan-agent on SSM Server node.
-package qan
+// Package ssm contains business logic of working with SSM agents and data on SSM Server node.
+package ssm
 
 import (
 	"bytes"
@@ -97,10 +97,10 @@ func (svc *Service) qanAgentConfigPath() string {
 	return filepath.Join(svc.baseDir, "config", "agent.conf")
 }
 
-// ensureAgentIsRegistered registers a single qan-agent instance on SSM Server node in QAN.
+// ensureQANAgentIsRegistered registers a single qan-agent instance on SSM Server node in QAN.
 // It does not re-register or change configuration if agent is already registered.
 // QAN API URL is always returned when no error is encountered.
-func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, error) {
+func (svc *Service) ensureQANAgentIsRegistered(ctx context.Context) (*url.URL, error) {
 	qanURL, err := getQanURL(ctx)
 	if err != nil {
 		return nil, err
@@ -151,8 +151,8 @@ func (svc *Service) ensureAgentIsRegistered(ctx context.Context) (*url.URL, erro
 	return qanURL, nil
 }
 
-// ensureAgentRuns checks qan-agent process status and starts it if it is not configured or down.
-func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor string, port uint16) error {
+// ensureQANAgentRuns checks qan-agent process status and starts it if it is not configured or down.
+func (svc *Service) ensureQANAgentRuns(ctx context.Context, nameForSupervisor string, port uint16) error {
 	err := svc.supervisor.Status(ctx, nameForSupervisor)
 	if err != nil {
 		// error can also mean that service status can't be determined, so we always stop it first
@@ -177,7 +177,7 @@ func (svc *Service) ensureAgentRuns(ctx context.Context, nameForSupervisor strin
 }
 
 // Restore ensures that agent is registered and running.
-func (svc *Service) Restore(
+func (svc *Service) RestoreQAN(
 	ctx context.Context,
 	nameForSupervisor string,
 	agent models.QanAgentWithSubsystem,
@@ -191,7 +191,7 @@ func (svc *Service) Restore(
 		return err
 	}
 
-	if err := svc.ensureAgentRuns(ctx, nameForSupervisor, *agent.ListenPort); err != nil {
+	if err := svc.ensureQANAgentRuns(ctx, nameForSupervisor, *agent.ListenPort); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -673,7 +673,7 @@ func (svc *Service) AddQAN(
 	qanAgent *models.QanAgent,
 	defaultConfig config.QAN,
 ) error {
-	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	qanURL, err := svc.ensureQANAgentIsRegistered(ctx)
 	if err != nil {
 		return err
 	}
@@ -715,7 +715,7 @@ func (svc *Service) AddQAN(
 		return errors.WithStack(err)
 	}
 
-	if err = svc.ensureAgentRuns(ctx, models.NameForSupervisor(qanAgent.Type, *qanAgent.ListenPort), *qanAgent.ListenPort); err != nil {
+	if err = svc.ensureQANAgentRuns(ctx, models.NameForSupervisor(qanAgent.Type, *qanAgent.ListenPort), *qanAgent.ListenPort); err != nil {
 		return err
 	}
 
@@ -743,13 +743,13 @@ func (svc *Service) AddQAN(
 }
 
 func (svc *Service) RemoveQAN(ctx context.Context, qanAgent *models.QanAgent, softRemove bool) error {
-	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	qanURL, err := svc.ensureQANAgentIsRegistered(ctx)
 	if err != nil {
 		return err
 	}
 
 	// agent should be running to remove instance from it
-	if err = svc.ensureAgentRuns(ctx, models.NameForSupervisor(qanAgent.Type, *qanAgent.ListenPort), *qanAgent.ListenPort); err != nil {
+	if err = svc.ensureQANAgentRuns(ctx, models.NameForSupervisor(qanAgent.Type, *qanAgent.ListenPort), *qanAgent.ListenPort); err != nil {
 		return err
 	}
 
@@ -781,7 +781,7 @@ func (svc *Service) RemoveQAN(ctx context.Context, qanAgent *models.QanAgent, so
 
 // RemoveClientQAN remove client-added qan
 func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID string) error {
-	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	qanURL, err := svc.ensureQANAgentIsRegistered(ctx)
 	if err != nil {
 		return err
 	}
@@ -802,7 +802,7 @@ func (svc *Service) RemoveClientQAN(ctx context.Context, agentID, instanceID str
 
 // RemoveQANData remove qan data
 func (svc *Service) RemoveQANData(ctx context.Context, instanceID string) error {
-	qanURL, err := svc.ensureAgentIsRegistered(ctx)
+	qanURL, err := svc.ensureQANAgentIsRegistered(ctx)
 	if err != nil {
 		return err
 	}

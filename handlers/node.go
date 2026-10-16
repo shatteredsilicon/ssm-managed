@@ -13,8 +13,8 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services/mongodb"
 	"github.com/shatteredsilicon/ssm-managed/services/node"
 	nodeSvc "github.com/shatteredsilicon/ssm-managed/services/node"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/remote"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -178,7 +178,7 @@ func (s *NodeServer) putConsulNodes(nodes []node.ClientNode, respNodes []*api.No
 	return respNodes
 }
 
-func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.NodeInstance) []*api.NodeInstance {
+func (s *NodeServer) putQanNodes(nodes []ssm.UnremovedNode, respNodes []*api.NodeInstance) []*api.NodeInstance {
 	for _, node := range nodes {
 		if node.Name == string(models.SSMServerNodeType) { // server itself
 			continue
@@ -191,9 +191,9 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 		} else {
 			nis.Region = string(models.ClientNodeRegion)
 			nis.Type = string(models.ClientMySQLQanAgentAgentType)
-			if node.SubsystemID == qan.SubsystemMongo {
+			if node.SubsystemID == ssm.SubsystemMongo {
 				nis.Type = string(models.ClientMongoDBQanAgentAgentType)
-			} else if node.SubsystemID == qan.SubsystemPostgreSQL {
+			} else if node.SubsystemID == ssm.SubsystemPostgreSQL {
 				nis.Type = string(models.ClientPostgresQanAgentAgentType)
 			}
 		}
@@ -206,17 +206,17 @@ func (s *NodeServer) putQanNodes(nodes []qan.UnremovedNode, respNodes []*api.Nod
 
 			serviceExists := false
 			for _, service := range respNodes[i].Services {
-				if node.SubsystemID == qan.SubsystemMySQL && (service.Type == string(models.QanAgentAgentType) ||
+				if node.SubsystemID == ssm.SubsystemMySQL && (service.Type == string(models.QanAgentAgentType) ||
 					service.Type == string(models.ClientMySQLQanAgentAgentType)) {
 					service.State = nis.State
 					serviceExists = true
 					break
-				} else if node.SubsystemID == qan.SubsystemMongo && (service.Type == string(models.QanAgentAgentType) ||
+				} else if node.SubsystemID == ssm.SubsystemMongo && (service.Type == string(models.QanAgentAgentType) ||
 					service.Type == string(models.ClientMongoDBQanAgentAgentType)) {
 					service.State = nis.State
 					serviceExists = true
 					break
-				} else if node.SubsystemID == qan.SubsystemPostgreSQL && (service.Type == string(models.QanAgentAgentType) ||
+				} else if node.SubsystemID == ssm.SubsystemPostgreSQL && (service.Type == string(models.QanAgentAgentType) ||
 					service.Type == string(models.ClientPostgresQanAgentAgentType)) {
 					service.State = nis.State
 					serviceExists = true

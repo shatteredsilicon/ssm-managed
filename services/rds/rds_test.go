@@ -43,7 +43,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services/mocks"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
 	"github.com/shatteredsilicon/ssm-managed/utils/tests"
 )
@@ -143,13 +143,13 @@ func setup(t *testing.T) (context.Context, *Service, *sql.DB, []byte, string, *m
 	qanDB, err := sql.Open("mysql", qanDSN)
 	require.Nil(t, err)
 
-	qan, err := qan.NewService(ctx, rootDir, supervisor, qanDB)
+	ssm, err := ssm.NewService(ctx, rootDir, supervisor, qanDB)
 	require.NoError(t, err)
 	svc, err := NewService(&ServiceConfig{
 		MySQLdExporterPath:    mySQLdExporterPath,
 		RDSExporterPath:       rdsExporterPath,
 		RDSExporterConfigPath: rdsExporterConfigPath,
-		QAN:                   qan,
+		SSM:                   ssm,
 		Supervisor:            supervisor,
 
 		DB:            db,
