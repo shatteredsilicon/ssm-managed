@@ -2,6 +2,7 @@ package watch
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
@@ -161,7 +162,13 @@ func (s *Service) updateEngine(ctx context.Context) {
 				}
 			}
 			if remoteInstance.Service.Type == models.MySQLServiceType {
-				newEngine, newVersion, err = s.mysql.EngineAndEngineVersion(ctx, address, port, username, password)
+				db, err := sql.Open("mysql", models.MySQLDSN(address, uint16(port), username, password))
+				if err != nil {
+					l.Errorf("Got an error when opening connection to mysql: %s\n", err)
+					continue
+				}
+				newEngine, newVersion, err = s.mysql.EngineAndEngineVersion(ctx, db)
+				db.Close()
 				if err != nil {
 					l.Errorf("Got an error when getting engine info for mysql service: %s\n", err)
 					continue

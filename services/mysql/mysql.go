@@ -21,6 +21,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -38,9 +39,10 @@ import (
 
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/services/agent"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
 	"github.com/shatteredsilicon/ssm/proto/config"
@@ -52,11 +54,11 @@ const (
 
 var (
 	DefaultSSMServerQANConfig = config.QAN{
-		CollectFrom: qan.SlowlogCollectFrom,
+		CollectFrom: ssm.SlowlogCollectFrom,
 		FilterAllow: []string{"SELECT", "DELETE"},
 	}
 	defaultRemoteQANConfig = config.QAN{
-		CollectFrom: qan.PerfschemaCollectFrom,
+		CollectFrom: ssm.PerfschemaCollectFrom,
 	}
 )
 
@@ -69,24 +71,20 @@ type ServiceConfig struct {
 	Supervisor    services.Supervisor
 	DB            *reform.DB
 	PortsRegistry *ports.Registry
-	QAN           *qan.Service
+	SSM           *ssm.Service
 	Consul        *consul.Client
+	ToolAgent     *agent.ToolAgent
+
+	SSMServerNodeID int32
 }
 
 // Service is responsible for interactions with AWS RDS.
 type Service struct {
 	*ServiceConfig
-	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
-	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, path := range []*string{
 		&config.MySQLdExporterPath,
 	} {
@@ -102,7 +100,6 @@ func NewService(config *ServiceConfig) (*Service, error) {
 
 	svc := &Service{
 		ServiceConfig: config,
-		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -280,7 +277,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 	}
 	agent := &models.MySQLdExporter{
 		Type:         models.MySQLdExporterAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -295,7 +292,7 @@ func (svc *Service) addMySQLdExporter(ctx context.Context, tx *reform.TX, servic
 
 	// check connection and a number of tables
 	var tableCount int
-	dsn := agent.DSN(service)
+	dsn := models.MySQLDSN(*service.Address, *service.Port, *agent.ServiceUsername, *agent.ServicePassword)
 	db, err := sql.Open("mysql", dsn)
 	if err == nil {
 		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
@@ -381,7 +378,7 @@ func (svc *Service) addQanAgent(
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -399,7 +396,7 @@ func (svc *Service) addQanAgent(
 	// so we do not check connection again
 
 	// start or reconfigure qan-agent
-	if svc.QAN != nil {
+	if svc.SSM != nil {
 		if qanConfig == nil {
 			qanConfig = &defaultRemoteQANConfig
 		}
@@ -408,7 +405,7 @@ func (svc *Service) addQanAgent(
 		if node.Type == models.SSMServerNodeType {
 			nodeName = string(node.Type) // ssm-server node uses type as name
 		}
-		if err = svc.QAN.AddQAN(ctx, nodeName, "mysql", agent.MySQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
+		if err = svc.SSM.AddQAN(ctx, nodeName, "mysql", models.MySQLDSN(*service.Address, *service.Port, *agent.ServiceUsername, *agent.ServicePassword), *service.EngineVersion, agent, *qanConfig); err != nil {
 			return err
 		}
 
@@ -419,6 +416,56 @@ func (svc *Service) addQanAgent(
 	}
 
 	return nil
+}
+
+func (svc *Service) addToolAgent(
+	ctx context.Context,
+	tx *reform.TX,
+	instance string,
+	service *models.MySQLService,
+	username, password string,
+	ssl bool,
+) error {
+	mysqlArgs := fmt.Sprintf("--user %s --password %s", username, password)
+	if _, err := os.Stat(*service.Address); err == nil { // internal db uses socket
+		mysqlArgs += fmt.Sprintf(" --socket %s", *service.Address)
+	} else {
+		mysqlArgs += fmt.Sprintf(" --host %s --port %d", *service.Address, *service.Port)
+	}
+
+	pmsCmd := fmt.Sprintf("pt-mysql-summary %s", mysqlArgs)
+	pdkcCmd := fmt.Sprintf("pt-duplicate-key-checker %s", mysqlArgs)
+	sukcCmd := fmt.Sprintf("st-unused-key-checker %s", mysqlArgs)
+	if ssl {
+		pmsCmd += " -- --ssl"
+		pdkcCmd += " s=true"
+		sukcCmd += " s=true"
+	}
+
+	return svc.ToolAgent.Add(
+		ctx,
+		tx,
+		&models.Service{
+			ID:     service.ID,
+			Type:   service.Type,
+			NodeID: service.NodeID,
+		},
+		instance,
+		[]agent.ToolAgentConfItem{
+			{
+				Name:       "pt-mysql-summary",
+				Executable: pmsCmd,
+			},
+			{
+				Name:       "pt-duplicate-key-checker",
+				Executable: pdkcCmd,
+			},
+			{
+				Name:       "st-unused-key-checker",
+				Executable: sukcCmd,
+			},
+		},
+	)
 }
 
 func (svc *Service) Add(
@@ -475,7 +522,7 @@ func (svc *Service) Add(
 		}
 		id = node.ID
 
-		engine, engineVersion, err := svc.EngineAndEngineVersion(ctx, address, port, username, password)
+		info, err := svc.MySQLServerInfo(ctx, address, port, username, password)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -487,8 +534,8 @@ func (svc *Service) Add(
 
 			Address:       &address,
 			Port:          pointer.ToUint16(uint16(port)),
-			Engine:        &engine,
-			EngineVersion: &engineVersion,
+			Engine:        &info.Engine,
+			EngineVersion: &info.EngineVersion,
 		}
 		if err = tx.Insert(service); err != nil {
 			return errors.WithStack(err)
@@ -498,6 +545,9 @@ func (svc *Service) Add(
 			return err
 		}
 		if err = svc.addQanAgent(ctx, tx, service, node, username, password, qanConfig); err != nil {
+			return err
+		}
+		if err = svc.addToolAgent(ctx, tx, name, service, username, password, info.SSL); err != nil {
 			return err
 		}
 
@@ -607,15 +657,25 @@ func (svc *Service) Remove(ctx context.Context, id int32) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.QAN != nil {
+				if svc.SSM != nil {
 					if node.Type == models.SSMServerNodeType {
-						err = svc.QAN.RemoveQAN(ctx, &a, true)
+						err = svc.SSM.RemoveQAN(ctx, &a, true)
 					} else {
-						err = svc.QAN.RemoveQAN(ctx, &a, false)
+						err = svc.SSM.RemoveQAN(ctx, &a, false)
 					}
 					if err != nil {
 						return err
 					}
+				}
+
+			case models.ToolAgentAgentType:
+				a := models.FullAgent{ID: agent.ID}
+				if err = tx.Reload(&a); err != nil {
+					return errors.WithStack(err)
+				}
+
+				if err := svc.ToolAgent.Remove(ctx, node.Name); err != nil {
+					return err
 				}
 			}
 		}
@@ -685,7 +745,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						}
 					}
 
-					dsn := a.DSN(service)
+					dsn := models.MySQLDSN(*service.Address, *service.Port, *a.ServiceUsername, *a.ServicePassword)
 					cfg := svc.mysqlExporterCfg(a, dsn)
 					if err = svc.Supervisor.Start(ctx, cfg); err != nil {
 						return err
@@ -697,7 +757,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.QAN != nil {
+				if svc.SSM != nil {
 					name := models.NameForSupervisor(a.Type, *a.ListenPort)
 					err := svc.Supervisor.Status(ctx, name)
 					if err == nil {
@@ -711,8 +771,8 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						qanConfig = DefaultSSMServerQANConfig
 					}
 
-					if err = svc.QAN.Restore(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "mysql"}, qanConfig); err != nil {
-						if _, ok := err.(qan.QANCommandError); ok {
+					if err = svc.SSM.RestoreQAN(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "mysql"}, qanConfig); err != nil {
+						if _, ok := err.(ssm.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),
 							// one should check what happens on the qan-agent side, ssm-managed
@@ -724,6 +784,29 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						return err
 					}
 				}
+
+			case models.ToolAgentAgentType:
+				if svc.ToolAgent != nil {
+					a := models.FullAgent{ID: agent.ID}
+					if err = tx.Reload(&a); err != nil {
+						return errors.WithStack(err)
+					}
+
+					db, err := sql.Open("mysql", models.MySQLDSN(*service.Address, *service.Port, *a.ServiceUsername, *a.ServicePassword))
+					if err != nil {
+						return errors.WithStack(err)
+					}
+
+					ssl, err := svc.isSSLUsed(ctx, db)
+					db.Close()
+					if err != nil {
+						return errors.WithStack(err)
+					}
+
+					if err := svc.addToolAgent(ctx, nil, node.Name, service, *a.ServiceUsername, *a.ServicePassword, ssl); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -731,30 +814,58 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 	return nil
 }
 
-// EngineAndEngineVersion get mysql engine version
-func (svc *Service) EngineAndEngineVersion(ctx context.Context, host string, port uint32, username string, password string) (string, string, error) {
+func (svc *Service) EngineAndEngineVersion(ctx context.Context, db *sql.DB) (string, string, error) {
 	var version string
 	var versionComment string
-	agent := models.MySQLdExporter{
-		ServiceUsername: pointer.ToString(username),
-		ServicePassword: pointer.ToString(password),
-	}
-	service := &models.MySQLService{
-		Address: &host,
-		Port:    pointer.ToUint16(uint16(port)),
-	}
-	dsn := agent.DSN(service)
-	db, err := sql.Open("mysql", dsn)
-	if err == nil {
-		sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
-		err = db.QueryRowContext(sqlCtx, "SELECT @@version, @@version_comment").Scan(&version, &versionComment)
-		cancel()
-		db.Close()
-	}
-	if err != nil {
+
+	sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
+	defer cancel()
+
+	if err := db.QueryRowContext(sqlCtx, "SELECT @@version, @@version_comment").Scan(&version, &versionComment); err != nil {
 		return "", "", errors.WithStack(err)
 	}
+
 	return NormalizeEngineAndEngineVersion(versionComment, version)
+}
+
+func (svc *Service) isSSLUsed(ctx context.Context, db *sql.DB) (bool, error) {
+	sqlCtx, cancel := context.WithTimeout(ctx, services.SQLCheckTimeout())
+	defer cancel()
+
+	var variableName, sslChip sql.NullString
+	if err := db.QueryRowContext(sqlCtx, "SHOW SESSION STATUS LIKE 'Ssl_cipher'").Scan(&variableName, &sslChip); err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	return sslChip.String != "", nil
+}
+
+type MySQLServerInfo struct {
+	Engine        string
+	EngineVersion string
+	SSL           bool
+}
+
+// MySQLServerInfo get mysql server info
+func (svc *Service) MySQLServerInfo(ctx context.Context, host string, port uint32, username string, password string) (*MySQLServerInfo, error) {
+	db, err := sql.Open("mysql", models.MySQLDSN(host, uint16(port), username, password))
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer db.Close()
+
+	var info MySQLServerInfo
+	info.Engine, info.EngineVersion, err = svc.EngineAndEngineVersion(ctx, db)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	info.SSL, err = svc.isSSLUsed(ctx, db)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &info, nil
 }
 
 // NormalizeEngineAndEngineVersion normalizes the output from

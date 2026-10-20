@@ -64,6 +64,17 @@ func (s *Supervisor) Start(ctx context.Context, config *servicelib.Config) error
 	return errors.Wrapf(svc.Start(), "failed to start %s", config.Name)
 }
 
+func (S *Supervisor) StartService(ctx context.Context, name string) error {
+	config := &servicelib.Config{Name: name}
+	svc, err := makeService(config)
+	if err != nil {
+		return err
+	}
+
+	logger.Get(ctx).WithField("component", "supervisor").Infof("Starting %s", config.Name)
+	return errors.Wrapf(svc.Start(), "failed to start %s", config.Name)
+}
+
 func (s *Supervisor) Stop(ctx context.Context, name string) error {
 	config := &servicelib.Config{Name: name}
 	svc, err := makeService(config)
@@ -78,6 +89,17 @@ func (s *Supervisor) Stop(ctx context.Context, name string) error {
 
 	logger.Get(ctx).WithField("component", "supervisor").Infof("Uninstalling %s", config.Name)
 	return errors.Wrapf(svc.Uninstall(), "failed to uninstall %s", config.Name)
+}
+
+func (S *Supervisor) StopService(ctx context.Context, name string) error {
+	config := &servicelib.Config{Name: name}
+	svc, err := makeService(config)
+	if err != nil {
+		return err
+	}
+
+	logger.Get(ctx).WithField("component", "supervisor").Infof("Stopping %s", config.Name)
+	return errors.Wrapf(svc.Stop(), "failed to stop %s", config.Name)
 }
 
 func (s *Supervisor) Status(ctx context.Context, name string) error {

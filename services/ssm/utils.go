@@ -1,5 +1,5 @@
-// pmm-managed
-// Copyright (C) 2017 Percona LLC
+// ssm-managed
+// Copyright (C) 2026 Shattered Silicon
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-package qan
+package ssm
 
 import (
 	"fmt"

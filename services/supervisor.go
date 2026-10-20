@@ -35,8 +35,14 @@ type Supervisor interface {
 	// Start installs and starts a service.
 	Start(ctx context.Context, config *servicelib.Config) error
 
+	// StartService starts a service
+	StartService(ctx context.Context, name string) error
+
 	// Start stops and uninstalls a service.
 	Stop(ctx context.Context, name string) error
+
+	// StopService stops a service
+	StopService(ctx context.Context, name string) error
 
 	// Status returns nil if service is installed and running.
 	// It returns error otherwise or if service status can't be determined.

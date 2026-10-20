@@ -13,14 +13,15 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/shatteredsilicon/ssm-managed/models"
 	"github.com/shatteredsilicon/ssm-managed/services"
+	"github.com/shatteredsilicon/ssm-managed/services/agent"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/mongodb"
 	"github.com/shatteredsilicon/ssm-managed/services/mysql"
 	"github.com/shatteredsilicon/ssm-managed/services/postgresql"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
 	"github.com/shatteredsilicon/ssm-managed/services/rds"
 	"github.com/shatteredsilicon/ssm-managed/services/snmp"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/utils"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/sirupsen/logrus"
@@ -39,7 +40,7 @@ const (
 // Service client service
 type Service struct {
 	consul        *consul.Client
-	qan           *qan.Service
+	ssm           *ssm.Service
 	prometheus    *prometheus.Service
 	prometheusAPI prometheusapi.Client
 	db            *reform.DB
@@ -48,17 +49,19 @@ type Service struct {
 	mongodb       *mongodb.Service
 	rds           *rds.Service
 	snmp          *snmp.Service
+	toolAgent     *agent.ToolAgent
+	supervisor    services.Supervisor
 }
 
 func NewService(
-	consul *consul.Client, qan *qan.Service, prometheus *prometheus.Service,
+	consul *consul.Client, ssm *ssm.Service, prometheus *prometheus.Service,
 	prometheusAPI prometheusapi.Client, db *reform.DB, mysql *mysql.Service,
 	postgresql *postgresql.Service, rds *rds.Service, snmp *snmp.Service,
-	mongodb *mongodb.Service,
+	mongodb *mongodb.Service, toolAgent *agent.ToolAgent, supervisor services.Supervisor,
 ) *Service {
 	return &Service{
 		consul:        consul,
-		qan:           qan,
+		ssm:           ssm,
 		prometheus:    prometheus,
 		prometheusAPI: prometheusAPI,
 		db:            db,
@@ -67,6 +70,8 @@ func NewService(
 		rds:           rds,
 		snmp:          snmp,
 		mongodb:       mongodb,
+		toolAgent:     toolAgent,
+		supervisor:    supervisor,
 	}
 }
 
@@ -313,13 +318,13 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 	}
 
 	if service == string(models.ClientMySQLQanAgentAgentType) {
-		subsystemIDs = []int{qan.SubsystemMySQL}
+		subsystemIDs = []int{ssm.SubsystemMySQL}
 	} else if service == string(models.ClientMongoDBQanAgentAgentType) {
-		subsystemIDs = []int{qan.SubsystemMongo}
+		subsystemIDs = []int{ssm.SubsystemMongo}
 	} else if service == string(models.ClientPostgresQanAgentAgentType) {
-		subsystemIDs = []int{qan.SubsystemPostgreSQL}
+		subsystemIDs = []int{ssm.SubsystemPostgreSQL}
 	} else if service == string(models.QanAgentAgentType) {
-		subsystemIDs = []int{qan.SubsystemMySQL, qan.SubsystemPostgreSQL}
+		subsystemIDs = []int{ssm.SubsystemMySQL, ssm.SubsystemPostgreSQL}
 	}
 
 	if len(subsystemIDs) == 0 {
@@ -347,13 +352,13 @@ func (svc *Service) removeServiceFromQan(ctx context.Context, nodeID, service st
 		}
 
 		// remove mysql qan queries
-		agentUUID, err := svc.qan.GetAgentUUIDFromDB(ctx, nodeID, node.SubsystemID)
+		agentUUID, err := svc.ssm.GetAgentUUIDFromDB(ctx, nodeID, node.SubsystemID)
 		if err != nil && err != sql.ErrNoRows {
 			return err
 		}
 
 		if agentUUID != "" {
-			err = svc.qan.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
+			err = svc.ssm.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
 			if err != nil {
 				return err
 			}
@@ -447,7 +452,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.mysql.MySQLdExporterPath != "" {
-				if err = svc.mysql.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+				if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
 					return err
 				}
 			}
@@ -458,7 +463,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.postgresql.PostgresExporterPath != "" {
-				if err = svc.postgresql.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+				if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
 					return err
 				}
 			}
@@ -484,7 +489,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 
 				// stop or restart rds_exporter
 				name := models.NameForSupervisor(a.Type, *a.ListenPort)
-				if err = svc.rds.Supervisor.Stop(ctx, name); err != nil {
+				if err = svc.supervisor.Stop(ctx, name); err != nil {
 					return err
 				}
 				if len(config.Instances) > 0 {
@@ -500,7 +505,7 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.mongodb.MongoDBExporterPath != "" {
-				if err = svc.mongodb.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+				if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
 					return err
 				}
 			}
@@ -510,9 +515,9 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 			if err = tx.Reload(&a); err != nil {
 				return errors.WithStack(err)
 			}
-			if svc.qan != nil {
+			if svc.ssm != nil {
 				<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-				if err = svc.qan.RemoveQAN(ctx, &a, false); err != nil {
+				if err = svc.ssm.RemoveQAN(ctx, &a, false); err != nil {
 					return err
 				}
 			}
@@ -523,9 +528,19 @@ func (svc *Service) removeServiceFromServer(ctx context.Context, nodeName, servi
 				return errors.WithStack(err)
 			}
 			if svc.snmp.SNMPExporterPath != "" {
-				if err = svc.snmp.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+				if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
 					return err
 				}
+			}
+
+		case models.ToolAgentAgentType:
+			a := models.FullAgent{ID: agent.ID}
+			if err = tx.Reload(&a); err != nil {
+				return errors.WithStack(err)
+			}
+
+			if err := svc.toolAgent.Remove(ctx, nodeName); err != nil {
+				return err
 			}
 		}
 
@@ -580,13 +595,13 @@ func (svc *Service) removeNodeFromQan(ctx context.Context, nodeID string) error 
 		}
 
 		// remove mysql qan queries
-		agentUUID, err := svc.qan.GetAgentUUIDFromDB(ctx, nodeID, node.SubsystemID)
+		agentUUID, err := svc.ssm.GetAgentUUIDFromDB(ctx, nodeID, node.SubsystemID)
 		if err != nil && err != sql.ErrNoRows {
 			return err
 		}
 
 		if err == nil {
-			err = svc.qan.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
+			err = svc.ssm.RemoveClientQAN(ctx, agentUUID, node.InstanceUUID)
 			if err != nil {
 				return err
 			}
@@ -675,7 +690,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 					return errors.WithStack(err)
 				}
 				if svc.mysql.MySQLdExporterPath != "" {
-					if err = svc.mysql.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
+					if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
 						return err
 					}
 				}
@@ -686,7 +701,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 					return errors.WithStack(err)
 				}
 				if svc.postgresql.PostgresExporterPath != "" {
-					if err = svc.postgresql.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
+					if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
 						return err
 					}
 				}
@@ -705,11 +720,11 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 
 					// stop or restart rds_exporter
 					name := models.NameForSupervisor(a.Type, *a.ListenPort)
-					if err = svc.rds.Supervisor.Stop(ctx, name); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
+					if err = svc.supervisor.Stop(ctx, name); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
 						return err
 					}
 					if len(config.Instances) > 0 {
-						if err = svc.rds.Supervisor.Start(ctx, svc.rds.RDSExporterServiceConfig(&a)); err != nil {
+						if err = svc.supervisor.Start(ctx, svc.rds.RDSExporterServiceConfig(&a)); err != nil {
 							return err
 						}
 					}
@@ -721,7 +736,7 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 					return errors.WithStack(err)
 				}
 				if svc.mongodb.MongoDBExporterPath != "" {
-					if err = svc.mongodb.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
+					if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil && !strings.Contains(err.Error(), services.ErrNoSuchFileOrDir.Error()) {
 						return err
 					}
 				}
@@ -731,9 +746,9 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.qan != nil {
+				if svc.ssm != nil {
 					<-time.NewTimer(1 * time.Second).C // delay a little bit to avoid duplicate record in qan database
-					if err = svc.qan.RemoveQAN(ctx, &a, false); err != nil {
+					if err = svc.ssm.RemoveQAN(ctx, &a, false); err != nil {
 						return err
 					}
 				}
@@ -744,9 +759,20 @@ func (svc *Service) removeNodeFromServer(ctx context.Context, nodeID string) err
 					return errors.WithStack(err)
 				}
 				if svc.snmp.SNMPExporterPath != "" {
-					if err = svc.snmp.Supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
+					if err = svc.supervisor.Stop(ctx, models.NameForSupervisor(a.Type, *a.ListenPort)); err != nil {
 						return err
 					}
+				}
+
+			case models.ToolAgentAgentType:
+				a := models.FullAgent{ID: agent.ID}
+				if err = tx.Reload(&a); err != nil {
+					return errors.WithStack(err)
+				}
+
+				serviceName := svc.toolAgent.ToolAgentServiceName(nodeID)
+				if err := svc.supervisor.Stop(ctx, serviceName); err != nil {
+					return err
 				}
 			}
 		}
@@ -863,8 +889,8 @@ func (svc *Service) GetConsulNodes(ctx context.Context) ([]ClientNode, error) {
 }
 
 // GetQanNodes returns client nodes from QAN
-func (svc *Service) GetQanNodes(ctx context.Context, name string, checkData bool) ([]qan.UnremovedNode, error) {
-	return svc.qan.GetUnremovedNodes(ctx, name, checkData)
+func (svc *Service) GetQanNodes(ctx context.Context, name string, checkData bool) ([]ssm.UnremovedNode, error) {
+	return svc.ssm.GetUnremovedNodes(ctx, name, checkData)
 }
 
 type PrometheusNodeService struct {
@@ -1047,4 +1073,16 @@ func (svc *Service) GetInstanceServiceState(lastActiveTs time.Time) uint32 {
 	}
 
 	return inactiveState
+}
+
+func (svc *Service) AddToolReport(ctx context.Context, nodeName string, ts time.Time, toolType string, payload []byte) error {
+	return svc.ssm.AddToolReport(ctx, nodeName, ts, toolType, payload)
+}
+
+func (svc *Service) GetToolReport(ctx context.Context, nodeName, toolType string) (*ssm.ToolReport, error) {
+	if r, err := svc.ssm.GetLatestToolReport(ctx, nodeName, toolType); err != nil && err != sql.ErrNoRows {
+		return nil, err
+	} else {
+		return r, nil
+	}
 }

@@ -41,7 +41,7 @@ import (
 	"github.com/shatteredsilicon/ssm-managed/services"
 	"github.com/shatteredsilicon/ssm-managed/services/consul"
 	"github.com/shatteredsilicon/ssm-managed/services/prometheus"
-	"github.com/shatteredsilicon/ssm-managed/services/qan"
+	"github.com/shatteredsilicon/ssm-managed/services/ssm"
 	"github.com/shatteredsilicon/ssm-managed/utils/logger"
 	"github.com/shatteredsilicon/ssm-managed/utils/ports"
 	"github.com/shatteredsilicon/ssm/proto/config"
@@ -57,7 +57,7 @@ var (
 	cockroachDBRegexp = regexp.MustCompile(`CockroachDB CCL (v[\d\.]+)`)
 )
 
-var defaultRemoteQANConfig = config.QAN{CollectFrom: qan.TableCollectFrom}
+var defaultRemoteQANConfig = config.QAN{CollectFrom: ssm.TableCollectFrom}
 
 type ServiceConfig struct {
 	PostgresExporterPath string
@@ -65,25 +65,20 @@ type ServiceConfig struct {
 	Prometheus    *prometheus.Service
 	Supervisor    services.Supervisor
 	DB            *reform.DB
-	QAN           *qan.Service
+	SSM           *ssm.Service
 	PortsRegistry *ports.Registry
 	Consul        *consul.Client
+
+	SSMServerNodeID int32
 }
 
 // Service is responsible for interactions with PostgreSQL.
 type Service struct {
 	*ServiceConfig
-	ssmServerNode *models.Node
 }
 
 // NewService creates a new service.
 func NewService(config *ServiceConfig) (*Service, error) {
-	var node models.Node
-	err := config.DB.FindOneTo(&node, "type", models.SSMServerNodeType)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, path := range []*string{
 		&config.PostgresExporterPath,
 	} {
@@ -99,7 +94,6 @@ func NewService(config *ServiceConfig) (*Service, error) {
 
 	svc := &Service{
 		ServiceConfig: config,
-		ssmServerNode: &node,
 	}
 	return svc, nil
 }
@@ -468,7 +462,7 @@ func (svc *Service) AddPostgresExporter(ctx context.Context, tx *reform.TX, serv
 	}
 	agent := &models.PostgresExporter{
 		Type:         models.PostgresExporterAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -526,7 +520,7 @@ func (svc *Service) addQanAgent(
 	// insert qan-agent agent and association
 	agent := &models.QanAgent{
 		Type:         models.QanAgentAgentType,
-		RunsOnNodeID: svc.ssmServerNode.ID,
+		RunsOnNodeID: svc.SSMServerNodeID,
 
 		ServiceUsername: &username,
 		ServicePassword: &password,
@@ -544,7 +538,7 @@ func (svc *Service) addQanAgent(
 	// so we do not check connection again
 
 	// start or reconfigure qan-agent
-	if svc.QAN != nil {
+	if svc.SSM != nil {
 		if qanConfig == nil {
 			qanConfig = &defaultRemoteQANConfig
 		}
@@ -553,7 +547,7 @@ func (svc *Service) addQanAgent(
 		if node.Type == models.SSMServerNodeType {
 			nodeName = string(node.Type) // ssm-server node uses type as name
 		}
-		if err = svc.QAN.AddQAN(ctx, nodeName, "postgresql", agent.PostgreSQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
+		if err = svc.SSM.AddQAN(ctx, nodeName, "postgresql", agent.PostgreSQLDSN(service), *service.EngineVersion, agent, *qanConfig); err != nil {
 			return err
 		}
 
@@ -617,7 +611,7 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 				if err = tx.Reload(&a); err != nil {
 					return errors.WithStack(err)
 				}
-				if svc.QAN != nil {
+				if svc.SSM != nil {
 					name := models.NameForSupervisor(a.Type, *a.ListenPort)
 					err := svc.Supervisor.Status(ctx, name)
 					if err == nil {
@@ -626,8 +620,8 @@ func (svc *Service) Restore(ctx context.Context, tx *reform.TX) error {
 						}
 					}
 
-					if err = svc.QAN.Restore(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "postgresql"}, defaultRemoteQANConfig); err != nil {
-						if _, ok := err.(qan.QANCommandError); ok {
+					if err = svc.SSM.RestoreQAN(ctx, name, models.QanAgentWithSubsystem{QanAgent: a, Subsystem: "postgresql"}, defaultRemoteQANConfig); err != nil {
+						if _, ok := err.(ssm.QANCommandError); ok {
 							// if it's a QAN command error, we should have already
 							// restored the qan configs (although may not be perfectly),
 							// one should check what happens on the qan-agent side, ssm-managed

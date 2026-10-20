@@ -18,7 +18,6 @@ package models
 
 import (
 	"fmt"
-	"io/fs"
 	"net"
 	"net/url"
 	"os"
@@ -47,6 +46,7 @@ const (
 	ProxySQLExporterAgentType       AgentType = "proxysql_exporter"
 	MongoDBExporterAgentType        AgentType = "mongodb_exporter"
 	SNMPExporterAgentType           AgentType = "snmp_exporter"
+	ToolAgentAgentType              AgentType = "tool-agent"
 	ClientNodeExporterAgentType     AgentType = "linux:metrics"
 	ClientMySQLdExporterAgentType   AgentType = "mysql:metrics"
 	ClientMySQLQanAgentAgentType    AgentType = "mysql:queries"
@@ -55,6 +55,7 @@ const (
 	ClientPostgresExporterAgentType AgentType = "postgresql:metrics"
 	ClientPostgresQanAgentAgentType AgentType = "postgresql:queries"
 	ClientProxySQLExporterAgentType AgentType = "proxysql:metrics"
+	ClientToolAgentAgentType        AgentType = "tool:agent"
 
 	QanAgentPort    uint16 = 9000
 	RDSExporterPort uint16 = 9042
@@ -88,25 +89,23 @@ type MySQLdExporter struct {
 	MySQLDisableTablestats *bool   `reform:"mysql_disable_tablestats"`
 }
 
-func (m *MySQLdExporter) DSN(service *MySQLService) string {
+func MySQLDSN(address string, port uint16, username, password string) string {
 	cfg := mysql.NewConfig()
-	cfg.User = *m.ServiceUsername
-	cfg.Passwd = *m.ServicePassword
+	cfg.TLSConfig = "preferred"
+	cfg.User = username
+	cfg.Passwd = password
 
-	if _, err := os.Stat(*service.Address); err == nil {
-		// check if address is a valid filepath and
-		// if that file exists, if so assume that it's
-		// a unix socket
+	// internal QAN uses socket
+	if _, err := os.Stat(address); err == nil {
+		cfg.Addr = address
 		cfg.Net = "unix"
-		cfg.Addr = *service.Address
 	} else {
 		cfg.Net = "tcp"
-		cfg.Addr = net.JoinHostPort(*service.Address, strconv.Itoa(int(*service.Port)))
+		cfg.Addr = net.JoinHostPort(address, strconv.Itoa(int(port)))
 	}
 
 	cfg.Timeout = sqlDialTimeout
 
-	// TODO TLSConfig: "true", https://jira.percona.com/browse/PMM-1727
 	// TODO Other parameters?
 	return cfg.FormatDSN()
 }
@@ -203,28 +202,6 @@ type FullAgent struct {
 	ServicePassword        *string `reform:"service_password"`
 	ListenPort             *uint16 `reform:"listen_port"`
 	MySQLDisableTablestats *bool   `reform:"mysql_disable_tablestats"`
-}
-
-func (q *QanAgent) MySQLDSN(service *MySQLService) string {
-	cfg := mysql.NewConfig()
-	cfg.User = *q.ServiceUsername
-	cfg.Passwd = *q.ServicePassword
-
-	// internal QAN uses socket
-	if fileInfo, err := os.Stat(*service.Address); err == nil && fileInfo.Mode().Type() == fs.ModeSocket {
-		cfg.Addr = *service.Address
-		cfg.Net = "unix"
-		return cfg.FormatDSN()
-	}
-
-	cfg.Net = "tcp"
-	cfg.Addr = net.JoinHostPort(*service.Address, strconv.Itoa(int(*service.Port)))
-
-	cfg.Timeout = sqlDialTimeout
-
-	// TODO TLSConfig: "true", https://jira.percona.com/browse/PMM-1727
-	// TODO Other parameters?
-	return cfg.FormatDSN()
 }
 
 func (q *QanAgent) PostgreSQLDSN(service *PostgreSQLService) string {
